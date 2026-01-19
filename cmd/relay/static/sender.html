@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AirPipe</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.container{max-width:400px;width:100%;text-align:center}
+.logo{font-size:2rem;font-weight:700;margin-bottom:2rem;color:#00d4ff}
+.card{background:#151515;border-radius:16px;padding:2rem;border:1px solid #252525}
+.status{font-size:1.1rem;margin-bottom:1.5rem;color:#ccc}
+.upload{border:2px dashed #333;border-radius:12px;padding:2rem;cursor:pointer;margin-bottom:1rem}
+.upload:hover{border-color:#00d4ff;background:rgba(0,212,255,0.05)}
+.filename{font-family:monospace;background:#0a0a0a;padding:0.75rem;border-radius:8px;margin-bottom:1.5rem;color:#00d4ff}
+.progress-bar{background:#252525;border-radius:8px;height:8px;overflow:hidden;margin-bottom:1rem}
+.progress-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#7b2fff);width:0%;transition:width 0.3s}
+.progress-text{font-size:0.9rem;color:#666}
+.spinner{width:40px;height:40px;border:3px solid #252525;border-top-color:#00d4ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none}
+.success{color:#44ff88}
+.error{color:#ff4444}
+.badge{display:inline-block;background:rgba(68,255,136,0.1);color:#44ff88;padding:0.5rem 1rem;border-radius:20px;font-size:0.8rem;margin-top:1.5rem}
+input[type=file]{display:none}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="logo">AirPipe</div>
+<div class="card">
+<div id="connecting"><div class="spinner"></div><div class="status">Connecting...</div></div>
+<div id="select" class="hidden"><div class="status">Select a file</div><div class="upload" id="dropzone">📁 Tap to select</div><input type="file" id="fileinput"></div>
+<div id="sending" class="hidden"><div class="status">Sending</div><div class="filename" id="filename">-</div><div class="progress-bar"><div class="progress-fill" id="progress"></div></div><div class="progress-text" id="ptext">0%</div></div>
+<div id="complete" class="hidden"><div class="status success">✓ Complete</div></div>
+<div id="error" class="hidden"><div class="status error">✗ Failed</div><div class="filename" id="errmsg">-</div></div>
+<div class="badge">🔒 End-to-end encrypted</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl-fast.min.js"></script>
+<script>
+const CHUNK=64*1024;
+const token=location.pathname.split('/').pop();
+const key=location.hash.slice(1);
+if(!token||!key){show('error');document.getElementById('errmsg').textContent='Invalid link';throw''}
+let keyBytes;
+try{keyBytes=b64decode(key);if(keyBytes.length!==32)throw'';}catch(e){show('error');document.getElementById('errmsg').textContent='Invalid key';throw e}
+const ws=new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/ws/'+token);
+ws.binaryType='arraybuffer';
+ws.onopen=()=>{show('select')};
+ws.onerror=()=>{show('error');document.getElementById('errmsg').textContent='Connection error'};
+document.getElementById('dropzone').onclick=()=>document.getElementById('fileinput').click();
+document.getElementById('fileinput').onchange=(e)=>{if(e.target.files.length)sendFile(e.target.files[0])};
+async function sendFile(file){
+document.getElementById('filename').textContent=file.name;
+show('sending');
+const meta={filename:file.name,size:file.size,chunks:Math.ceil(file.size/CHUNK)};
+ws.send(encrypt(encode(0x01,new TextEncoder().encode(JSON.stringify(meta))),keyBytes));
+let offset=0;
+while(offset<file.size){
+const chunk=await file.slice(offset,offset+CHUNK).arrayBuffer();
+ws.send(encrypt(encode(0x10,new Uint8Array(chunk)),keyBytes));
+offset+=CHUNK;
+const p=Math.round(Math.min(offset,file.size)/file.size*100);
+document.getElementById('progress').style.width=p+'%';
+document.getElementById('ptext').textContent=p+'%';
+await new Promise(r=>setTimeout(r,10));
+}
+ws.send(encrypt(encode(0x03,new Uint8Array(0)),keyBytes));
+show('complete');
+}
+function show(id){['connecting','select','sending','complete','error'].forEach(x=>document.getElementById(x).classList.add('hidden'));document.getElementById(id).classList.remove('hidden')}
+function encrypt(data,key){const nonce=nacl.randomBytes(24);const enc=nacl.secretbox(data,nonce,key);const r=new Uint8Array(24+enc.length);r.set(nonce);r.set(enc,24);return r}
+function encode(type,payload){const r=new Uint8Array(5+payload.length);r[0]=type;r[1]=(payload.length>>24)&0xff;r[2]=(payload.length>>16)&0xff;r[3]=(payload.length>>8)&0xff;r[4]=payload.length&0xff;r.set(payload,5);return r}
+function b64decode(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const b=atob(s);const r=new Uint8Array(b.length);for(let i=0;i<b.length;i++)r[i]=b.charCodeAt(i);return r}
+</script>
+</body>
+</html>
