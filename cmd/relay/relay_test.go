@@ -1,6 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -19,7 +23,6 @@ func TestRoomManagerCreateAndGet(t *testing.T) {
 		t.Fatalf("expected token abc123, got %s", room.token)
 	}
 
-	// Same token returns same room
 	room2 := rm.GetOrCreateRoom("abc123")
 	if room != room2 {
 		t.Fatal("expected same room instance for same token")
@@ -40,7 +43,6 @@ func TestRoomManagerDelete(t *testing.T) {
 	rm.GetOrCreateRoom("delete-me")
 	rm.DeleteRoom("delete-me")
 
-	// Getting after delete should create a new room
 	room := rm.GetOrCreateRoom("delete-me")
 	if room == nil {
 		t.Fatal("expected new room after delete")
@@ -48,7 +50,6 @@ func TestRoomManagerDelete(t *testing.T) {
 }
 
 func TestRoomAddClientLimit(t *testing.T) {
-	// Test via WebSocket upgrade - create a real relay and connect 3 clients
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /ws/{token}", handleWebSocket)
 	server := httptest.NewServer(mux)
@@ -56,7 +57,6 @@ func TestRoomAddClientLimit(t *testing.T) {
 
 	wsURL := "ws" + server.URL[4:] + "/ws/limit-test"
 
-	// First two should connect fine
 	dialer := websocket.Dialer{}
 	conn1, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
@@ -70,15 +70,12 @@ func TestRoomAddClientLimit(t *testing.T) {
 	}
 	defer conn2.Close()
 
-	// Third should be rejected (room full)
 	conn3, _, err := dialer.Dial(wsURL, nil)
 	if err != nil {
-		// Connection refused is also acceptable
 		return
 	}
 	defer conn3.Close()
 
-	// If connected, should receive a close message
 	_, _, err = conn3.ReadMessage()
 	if err == nil {
 		t.Fatal("third client should have been rejected")
@@ -88,20 +85,17 @@ func TestRoomAddClientLimit(t *testing.T) {
 func TestRoomCleanup(t *testing.T) {
 	rm := &RoomManager{rooms: make(map[string]*Room)}
 
-	// Create an expired room
 	rm.rooms["old"] = &Room{
 		token:     "old",
 		clients:   nil,
 		createdAt: time.Now().Add(-15 * time.Minute),
 	}
-	// Create a fresh room
 	rm.rooms["new"] = &Room{
 		token:     "new",
 		clients:   nil,
 		createdAt: time.Now(),
 	}
 
-	// Run cleanup manually
 	rm.mu.Lock()
 	for token, room := range rm.rooms {
 		if time.Since(room.createdAt) > 10*time.Minute {
@@ -138,12 +132,11 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
-func TestDownloadEndpointMissingToken(t *testing.T) {
+func TestUploadPageEndpoint(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /d/{token}", handleDownload)
+	mux.HandleFunc("GET /u/{token}", handleUploadPage)
 
-	// Test with a valid token (should serve HTML)
-	req := httptest.NewRequest("GET", "/d/testtoken", nil)
+	req := httptest.NewRequest("GET", "/u/testtoken", nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
@@ -155,18 +148,105 @@ func TestDownloadEndpointMissingToken(t *testing.T) {
 	}
 }
 
-func TestUploadEndpoint(t *testing.T) {
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /u/{token}", handleUpload)
+func TestFileStoreRoundtrip(t *testing.T) {
+	fs := NewFileStore()
+	content := []byte("hello airpipe")
 
-	req := httptest.NewRequest("GET", "/u/testtoken", nil)
-	w := httptest.NewRecorder()
-	mux.ServeHTTP(w, req)
-
-	if w.Code != 200 {
-		t.Fatalf("expected 200, got %d", w.Code)
+	token, err := fs.Store("test.txt", bytes.NewReader(content))
+	if err != nil {
+		t.Fatalf("Store failed: %v", err)
 	}
-	if ct := w.Header().Get("Content-Type"); ct != "text/html; charset=utf-8" {
-		t.Fatalf("expected text/html content type, got %s", ct)
+	if len(token) != 6 {
+		t.Fatalf("expected 6 char token, got %d: %s", len(token), token)
+	}
+
+	sf, ok := fs.Get(token)
+	if !ok {
+		t.Fatal("file not found after store")
+	}
+	if sf.Filename != "test.txt" {
+		t.Fatalf("expected filename test.txt, got %s", sf.Filename)
+	}
+	if sf.Size != int64(len(content)) {
+		t.Fatalf("expected size %d, got %d", len(content), sf.Size)
+	}
+}
+
+func TestFileStoreNotFound(t *testing.T) {
+	fs := NewFileStore()
+	_, ok := fs.Get("nonexistent")
+	if ok {
+		t.Fatal("expected not found for nonexistent token")
+	}
+}
+
+func TestUploadAndDownload(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /upload", handleUploadFile)
+	mux.HandleFunc("GET /d/{token}", handleDownload)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	// Upload
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	part, _ := mw.CreateFormFile("file", "hello.txt")
+	part.Write([]byte("hello world"))
+	mw.Close()
+
+	resp, err := http.Post(server.URL+"/upload", mw.FormDataContentType(), body)
+	if err != nil {
+		t.Fatalf("upload request failed: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		t.Fatalf("upload returned %d", resp.StatusCode)
+	}
+
+	var result struct {
+		Token    string `json:"token"`
+		Filename string `json:"filename"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	if result.Token == "" {
+		t.Fatal("empty token in response")
+	}
+	if result.Filename != "hello.txt" {
+		t.Fatalf("expected filename hello.txt, got %s", result.Filename)
+	}
+
+	// Download
+	dlResp, err := http.Get(server.URL + "/d/" + result.Token)
+	if err != nil {
+		t.Fatalf("download request failed: %v", err)
+	}
+	defer dlResp.Body.Close()
+
+	if dlResp.StatusCode != 200 {
+		t.Fatalf("download returned %d", dlResp.StatusCode)
+	}
+
+	cd := dlResp.Header.Get("Content-Disposition")
+	if cd != `attachment; filename="hello.txt"` {
+		t.Fatalf("unexpected Content-Disposition: %s", cd)
+	}
+
+	downloaded, _ := io.ReadAll(dlResp.Body)
+	if string(downloaded) != "hello world" {
+		t.Fatalf("expected 'hello world', got %q", string(downloaded))
+	}
+}
+
+func TestDownloadNotFound(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /d/{token}", handleDownload)
+	server := httptest.NewServer(mux)
+	defer server.Close()
+
+	resp, _ := http.Get(server.URL + "/d/nonexistent")
+	if resp.StatusCode != 404 {
+		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
 }

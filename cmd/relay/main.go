@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/rand"
 	"embed"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net/http"
@@ -18,6 +23,94 @@ var staticFiles embed.FS
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
+
+// --- File Store (for HTTP upload/download) ---
+
+const (
+	maxUploadSize = 500 << 20 // 500MB
+	fileExpiry    = 10 * time.Minute
+)
+
+type StoredFile struct {
+	Path      string
+	Filename  string
+	Size      int64
+	CreatedAt time.Time
+}
+
+type FileStore struct {
+	mu    sync.RWMutex
+	files map[string]*StoredFile
+	dir   string
+}
+
+func NewFileStore() *FileStore {
+	dir, err := os.MkdirTemp("", "airpipe-*")
+	if err != nil {
+		log.Fatalf("failed to create temp dir: %v", err)
+	}
+	fs := &FileStore{files: make(map[string]*StoredFile), dir: dir}
+	go fs.cleanupLoop()
+	return fs
+}
+
+func (fs *FileStore) Store(filename string, r io.Reader) (string, error) {
+	token := genToken()
+
+	tmp, err := os.CreateTemp(fs.dir, "upload-*")
+	if err != nil {
+		return "", err
+	}
+
+	size, err := io.Copy(tmp, r)
+	tmp.Close()
+	if err != nil {
+		os.Remove(tmp.Name())
+		return "", err
+	}
+
+	fs.mu.Lock()
+	fs.files[token] = &StoredFile{
+		Path:      tmp.Name(),
+		Filename:  filename,
+		Size:      size,
+		CreatedAt: time.Now(),
+	}
+	fs.mu.Unlock()
+
+	log.Printf("stored file %q (%d bytes) as %s", filename, size, token)
+	return token, nil
+}
+
+func (fs *FileStore) Get(token string) (*StoredFile, bool) {
+	fs.mu.RLock()
+	defer fs.mu.RUnlock()
+	f, ok := fs.files[token]
+	return f, ok
+}
+
+func (fs *FileStore) cleanupLoop() {
+	ticker := time.NewTicker(1 * time.Minute)
+	for range ticker.C {
+		fs.mu.Lock()
+		for token, f := range fs.files {
+			if time.Since(f.CreatedAt) > fileExpiry {
+				os.Remove(f.Path)
+				delete(fs.files, token)
+				log.Printf("expired file %s", token)
+			}
+		}
+		fs.mu.Unlock()
+	}
+}
+
+func genToken() string {
+	b := make([]byte, 3)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// --- WebSocket Rooms (for receive flow) ---
 
 type Room struct {
 	token     string
@@ -103,7 +196,14 @@ func (room *Room) Broadcast(sender *websocket.Conn, message []byte) {
 	}
 }
 
-var roomManager = NewRoomManager()
+// --- Globals ---
+
+var (
+	roomManager = NewRoomManager()
+	fileStore   = NewFileStore()
+)
+
+// --- Handlers ---
 
 func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
@@ -145,23 +245,54 @@ func handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func handleUploadFile(w http.ResponseWriter, r *http.Request) {
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "upload failed: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	token, err := fileStore.Store(header.Filename, file)
+	if err != nil {
+		http.Error(w, "storage failed", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"token":    token,
+		"filename": header.Filename,
+	})
+}
+
 func handleDownload(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	if token == "" {
 		http.Error(w, "missing token", http.StatusBadRequest)
 		return
 	}
-	staticFS, _ := fs.Sub(staticFiles, "static")
-	content, err := fs.ReadFile(staticFS, "receiver.html")
-	if err != nil {
-		http.Error(w, "page not found", http.StatusNotFound)
+
+	sf, ok := fileStore.Get(token)
+	if !ok {
+		http.Error(w, "not found or expired", http.StatusNotFound)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(content)
+
+	f, err := os.Open(sf.Path)
+	if err != nil {
+		http.Error(w, "file unavailable", http.StatusInternalServerError)
+		return
+	}
+	defer f.Close()
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, sf.Filename))
+	http.ServeContent(w, r, sf.Filename, sf.CreatedAt, f)
 }
 
-func handleUpload(w http.ResponseWriter, r *http.Request) {
+func handleUploadPage(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	if token == "" {
 		http.Error(w, "missing token", http.StatusBadRequest)
@@ -183,9 +314,10 @@ func main() {
 		port = "8080"
 	}
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /ws/{token}", handleWebSocket)
+	mux.HandleFunc("POST /upload", handleUploadFile)
 	mux.HandleFunc("GET /d/{token}", handleDownload)
-	mux.HandleFunc("GET /u/{token}", handleUpload)
+	mux.HandleFunc("GET /u/{token}", handleUploadPage)
+	mux.HandleFunc("GET /ws/{token}", handleWebSocket)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`{"status":"ok"}`))
 	})

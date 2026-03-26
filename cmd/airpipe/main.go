@@ -3,18 +3,23 @@ package main
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
-	"time"
 
+	"github.com/sanyamgarg/airpipe/internal/archive"
 	"github.com/sanyamgarg/airpipe/internal/crypto"
 	"github.com/sanyamgarg/airpipe/internal/qr"
 	"github.com/sanyamgarg/airpipe/internal/transfer"
 )
 
-const defaultRelay = "wss://airpipe.sanyamgarg.com"
+const defaultRelay = "https://airpipe.sanyamgarg.com"
 
 func main() {
 	relay := flag.String("relay", defaultRelay, "Relay server URL")
@@ -22,7 +27,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) < 1 {
-		fmt.Println("Usage: airpipe send <file> | airpipe receive [dir]")
+		fmt.Println("Usage: airpipe send <file> [file2...] | airpipe receive [dir]")
 		os.Exit(1)
 	}
 
@@ -30,10 +35,10 @@ func main() {
 	switch args[0] {
 	case "send":
 		if len(args) < 2 {
-			fmt.Println("Usage: airpipe send <file>")
+			fmt.Println("Usage: airpipe send <file> [file2...]")
 			os.Exit(1)
 		}
-		err = cmdSend(*relay, args[1])
+		err = cmdSend(*relay, args[1:])
 	case "receive":
 		dir := "."
 		if len(args) >= 2 {
@@ -51,38 +56,58 @@ func main() {
 	}
 }
 
-func cmdSend(relay, filePath string) error {
-	stat, err := os.Stat(filePath)
+func cmdSend(relay string, files []string) error {
+	// Validate all paths exist
+	for _, f := range files {
+		if _, err := os.Stat(f); err != nil {
+			return fmt.Errorf("not found: %s", f)
+		}
+	}
+
+	// Determine if we need to zip
+	needsZip := len(files) > 1
+	if !needsZip {
+		info, _ := os.Stat(files[0])
+		needsZip = info.IsDir()
+	}
+
+	var uploadPath, filename string
+	if needsZip {
+		fmt.Print("\n  AirPipe - Send\n\n")
+		fmt.Printf("  Zipping %d items...\n", len(files))
+
+		zipPath, err := archive.ZipPaths(files)
+		if err != nil {
+			return fmt.Errorf("zip failed: %w", err)
+		}
+		defer os.Remove(zipPath)
+		uploadPath = zipPath
+		filename = "airpipe-transfer.zip"
+
+		stat, _ := os.Stat(zipPath)
+		fmt.Printf("  Archive: %s\n\n", fmtBytes(stat.Size()))
+	} else {
+		uploadPath = files[0]
+		filename = filepath.Base(files[0])
+		stat, _ := os.Stat(uploadPath)
+
+		fmt.Print("\n  AirPipe - Send\n\n")
+		fmt.Printf("  File: %s (%s)\n\n", filename, fmtBytes(stat.Size()))
+	}
+
+	fmt.Print("  Uploading...\n\n")
+
+	httpRelay := toHTTP(relay)
+	token, err := uploadFile(httpRelay, uploadPath, filename)
 	if err != nil {
-		return fmt.Errorf("file not found: %s", filePath)
+		return err
 	}
 
-	token := genToken()
-	key, _ := crypto.GenerateKey()
-
-	httpRelay := strings.Replace(strings.Replace(relay, "wss://", "https://", 1), "ws://", "http://", 1)
-	url := fmt.Sprintf("%s/d/%s#%s", httpRelay, token, crypto.KeyToBase64(key))
-
-	fmt.Print("\n  AirPipe - Send\n\n")
-	fmt.Printf("  File: %s (%s)\n\n", stat.Name(), fmtBytes(stat.Size()))
+	url := fmt.Sprintf("%s/d/%s", httpRelay, token)
 	qr.GenerateTerminal(url)
-	fmt.Printf("\n  %s\n\n  🔒 E2E Encrypted\n  ⏳ Waiting...\n\n", url)
+	fmt.Printf("\n  %s\n\n", url)
+	fmt.Print("  Expires in 10 minutes. Works with wget/curl.\n\n")
 
-	sender := transfer.NewSender(relay, token, key)
-	if err := sender.Connect(); err != nil {
-		return err
-	}
-	defer sender.Close()
-
-	if err := sender.WaitForReceiver(5 * time.Minute); err != nil {
-		return err
-	}
-	fmt.Print("  ✓ Connected!\n\n")
-
-	if err := sender.SendFile(filePath, progress); err != nil {
-		return err
-	}
-	fmt.Print("\n  ✓ Done!\n\n")
 	return nil
 }
 
@@ -90,15 +115,16 @@ func cmdReceive(relay, destDir string) error {
 	token := genToken()
 	key, _ := crypto.GenerateKey()
 
-	httpRelay := strings.Replace(strings.Replace(relay, "wss://", "https://", 1), "ws://", "http://", 1)
+	wsRelay := toWS(relay)
+	httpRelay := toHTTP(relay)
 	url := fmt.Sprintf("%s/u/%s#%s", httpRelay, token, crypto.KeyToBase64(key))
 
 	fmt.Print("\n  AirPipe - Receive\n\n")
 	fmt.Printf("  Destination: %s\n\n", destDir)
 	qr.GenerateTerminal(url)
-	fmt.Printf("\n  %s\n\n  🔒 E2E Encrypted\n  ⏳ Waiting...\n\n", url)
+	fmt.Printf("\n  %s\n\n  Waiting...\n\n", url)
 
-	receiver := transfer.NewReceiver(relay, token, key)
+	receiver := transfer.NewReceiver(wsRelay, token, key)
 	if err := receiver.Connect(); err != nil {
 		return err
 	}
@@ -112,10 +138,99 @@ func cmdReceive(relay, destDir string) error {
 	return nil
 }
 
+func uploadFile(baseURL, filePath, filename string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	stat, _ := file.Stat()
+	fileSize := stat.Size()
+
+	pr, pw := io.Pipe()
+	mw := multipart.NewWriter(pw)
+
+	errCh := make(chan error, 1)
+	go func() {
+		part, err := mw.CreateFormFile("file", filename)
+		if err != nil {
+			pw.CloseWithError(err)
+			errCh <- err
+			return
+		}
+
+		buf := make([]byte, 32*1024)
+		var written int64
+		for {
+			n, readErr := file.Read(buf)
+			if n > 0 {
+				if _, writeErr := part.Write(buf[:n]); writeErr != nil {
+					pw.CloseWithError(writeErr)
+					errCh <- writeErr
+					return
+				}
+				written += int64(n)
+				progress(written, fileSize)
+			}
+			if readErr == io.EOF {
+				break
+			}
+			if readErr != nil {
+				pw.CloseWithError(readErr)
+				errCh <- readErr
+				return
+			}
+		}
+
+		mw.Close()
+		pw.Close()
+		errCh <- nil
+	}()
+
+	req, _ := http.NewRequest("POST", baseURL+"/upload", pr)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("upload failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if uploadErr := <-errCh; uploadErr != nil {
+		return "", uploadErr
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("upload failed (%d): %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Token string `json:"token"`
+	}
+	json.NewDecoder(resp.Body).Decode(&result)
+
+	fmt.Print("\r  ✓ Uploaded                                      \n\n")
+	return result.Token, nil
+}
+
 func genToken() string {
-	b := make([]byte, 16)
+	b := make([]byte, 3)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+func toHTTP(url string) string {
+	url = strings.Replace(url, "wss://", "https://", 1)
+	url = strings.Replace(url, "ws://", "http://", 1)
+	return url
+}
+
+func toWS(url string) string {
+	url = strings.Replace(url, "https://", "wss://", 1)
+	url = strings.Replace(url, "http://", "ws://", 1)
+	return url
 }
 
 func fmtBytes(b int64) string {

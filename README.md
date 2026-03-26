@@ -1,18 +1,18 @@
 # AirPipe
 
-Transfer files between terminal and phone with a QR code. No apps. No accounts. End-to-end encrypted.
+Transfer files between terminal and any device with a QR code. No apps. No accounts.
 ```
 $ airpipe send config.yaml
 ```
 
 ![demo](demo.gif)
 
-Scan → file downloads. Done.
+Scan or wget the link. Done.
 
 ## Install
 ```bash
-# Auto-Detection
-curl -sL https://raw.githubusercontent.com/Sanyam-G/Airpipe/main/install.sh |sh
+# Auto-detect OS/arch
+curl -sL https://raw.githubusercontent.com/Sanyam-G/Airpipe/main/install.sh | sh
 
 # From source
 go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest
@@ -20,35 +20,39 @@ go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest
 
 ## Usage
 
-**Send file (server → phone):**
+**Send a file:**
 ```bash
 airpipe send ./error.log
 ```
 
-**Receive file (phone → server):**
+**Send multiple files (auto-zipped):**
+```bash
+airpipe send file1.txt file2.txt photos/
+```
+
+**Download on the other end:**
+```bash
+# Scan QR, or use wget/curl
+wget https://airpipe.sanyamgarg.com/d/a1b2c3
+curl -O https://airpipe.sanyamgarg.com/d/a1b2c3
+```
+
+**Receive file (phone to server):**
 ```bash
 airpipe receive ./downloads
 ```
 
 ## How it works
 
-1. CLI generates encryption key locally
-2. Key embedded in URL fragment (`#...`) — never sent to server
-3. File encrypted locally, streamed through relay
-4. Phone decrypts in browser
-5. Relay only sees encrypted bytes — zero knowledge
+**Send:** CLI uploads file to relay, prints a short URL + QR code. Anyone with the link can download via browser, wget, or curl. Files expire after 10 minutes.
+
+**Receive:** CLI opens a WebSocket room, shows QR. Phone scans, selects file, uploads through browser. File is E2E encrypted (NaCl secretbox, key in URL fragment).
 
 ## Self-host relay
 ```bash
 docker run -p 8080:8080 ghcr.io/sanyam-g/airpipe-relay
-airpipe --relay wss://your-server:8080 send file.txt
+airpipe --relay https://your-server:8080 send file.txt
 ```
-
-## Security
-
-- **Encryption:** NaCl secretbox (XSalsa20-Poly1305)
-- **Key exchange:** None — key in URL fragment, never touches server
-- **Tokens:** Random, single-use, 10-minute expiry
 
 ## License
 
