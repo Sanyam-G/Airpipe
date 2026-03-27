@@ -7,7 +7,7 @@ $ airpipe send config.yaml
 
 ![demo](demo.gif)
 
-Scan or wget the link. Done.
+Scan the QR, file downloads. Done.
 
 ## Install
 ```bash
@@ -30,13 +30,6 @@ airpipe send ./error.log
 airpipe send file1.txt file2.txt photos/
 ```
 
-**Download on the other end:**
-```bash
-# Scan QR, or use wget/curl
-wget https://airpipe.sanyamgarg.com/d/a1b2c3
-curl -O https://airpipe.sanyamgarg.com/d/a1b2c3
-```
-
 **Receive file (phone to server):**
 ```bash
 airpipe receive ./downloads
@@ -44,9 +37,13 @@ airpipe receive ./downloads
 
 ## How it works
 
-**Send:** CLI uploads file to relay, prints a short URL + QR code. Anyone with the link can download via browser, wget, or curl. Files expire after 10 minutes.
+Both directions are end-to-end encrypted. The relay only sees ciphertext.
 
-**Receive:** CLI opens a WebSocket room, shows QR. Phone scans, selects file, uploads through browser. File is E2E encrypted (NaCl secretbox, key in URL fragment).
+**Send:** CLI encrypts file locally (NaCl secretbox), uploads ciphertext to relay, shows QR code. Encryption key lives in the URL fragment (`#...`) and never reaches the server. Browser decrypts on download.
+
+**Receive:** CLI opens a WebSocket room, shows QR. Phone scans, selects file, encrypts in browser, streams through relay. CLI decrypts locally.
+
+Files expire after 10 minutes. Relay is zero-knowledge.
 
 ## Self-host relay
 ```bash

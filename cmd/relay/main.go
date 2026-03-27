@@ -5,7 +5,6 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/fs"
 	"log"
@@ -268,7 +267,29 @@ func handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func handleDownload(w http.ResponseWriter, r *http.Request) {
+func handleDownloadPage(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if token == "" {
+		http.Error(w, "missing token", http.StatusBadRequest)
+		return
+	}
+
+	if _, ok := fileStore.Get(token); !ok {
+		http.Error(w, "not found or expired", http.StatusNotFound)
+		return
+	}
+
+	staticFS, _ := fs.Sub(staticFiles, "static")
+	content, err := fs.ReadFile(staticFS, "download.html")
+	if err != nil {
+		http.Error(w, "page not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
+}
+
+func handleRawDownload(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
 	if token == "" {
 		http.Error(w, "missing token", http.StatusBadRequest)
@@ -288,8 +309,8 @@ func handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer f.Close()
 
-	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, sf.Filename))
-	http.ServeContent(w, r, sf.Filename, sf.CreatedAt, f)
+	w.Header().Set("Content-Type", "application/octet-stream")
+	http.ServeContent(w, r, "", sf.CreatedAt, f)
 }
 
 func handleUploadPage(w http.ResponseWriter, r *http.Request) {
@@ -315,7 +336,8 @@ func main() {
 	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /upload", handleUploadFile)
-	mux.HandleFunc("GET /d/{token}", handleDownload)
+	mux.HandleFunc("GET /d/{token}", handleDownloadPage)
+	mux.HandleFunc("GET /raw/{token}", handleRawDownload)
 	mux.HandleFunc("GET /u/{token}", handleUploadPage)
 	mux.HandleFunc("GET /ws/{token}", handleWebSocket)
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {

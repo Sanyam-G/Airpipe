@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"mime/multipart"
+	"strings"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -183,15 +184,16 @@ func TestFileStoreNotFound(t *testing.T) {
 func TestUploadAndDownload(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /upload", handleUploadFile)
-	mux.HandleFunc("GET /d/{token}", handleDownload)
+	mux.HandleFunc("GET /d/{token}", handleDownloadPage)
+	mux.HandleFunc("GET /raw/{token}", handleRawDownload)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
 	// Upload
 	body := &bytes.Buffer{}
 	mw := multipart.NewWriter(body)
-	part, _ := mw.CreateFormFile("file", "hello.txt")
-	part.Write([]byte("hello world"))
+	part, _ := mw.CreateFormFile("file", "encrypted.bin")
+	part.Write([]byte("ciphertext-bytes"))
 	mw.Close()
 
 	resp, err := http.Post(server.URL+"/upload", mw.FormDataContentType(), body)
@@ -213,40 +215,54 @@ func TestUploadAndDownload(t *testing.T) {
 	if result.Token == "" {
 		t.Fatal("empty token in response")
 	}
-	if result.Filename != "hello.txt" {
-		t.Fatalf("expected filename hello.txt, got %s", result.Filename)
-	}
 
-	// Download
+	// /d/ should serve HTML download page
 	dlResp, err := http.Get(server.URL + "/d/" + result.Token)
 	if err != nil {
-		t.Fatalf("download request failed: %v", err)
+		t.Fatalf("download page request failed: %v", err)
 	}
 	defer dlResp.Body.Close()
 
 	if dlResp.StatusCode != 200 {
-		t.Fatalf("download returned %d", dlResp.StatusCode)
+		t.Fatalf("download page returned %d", dlResp.StatusCode)
 	}
 
-	cd := dlResp.Header.Get("Content-Disposition")
-	if cd != `attachment; filename="hello.txt"` {
-		t.Fatalf("unexpected Content-Disposition: %s", cd)
+	ct := dlResp.Header.Get("Content-Type")
+	if !strings.Contains(ct, "text/html") {
+		t.Fatalf("expected text/html, got %s", ct)
 	}
 
-	downloaded, _ := io.ReadAll(dlResp.Body)
-	if string(downloaded) != "hello world" {
-		t.Fatalf("expected 'hello world', got %q", string(downloaded))
+	// /raw/ should serve the raw encrypted bytes
+	rawResp, err := http.Get(server.URL + "/raw/" + result.Token)
+	if err != nil {
+		t.Fatalf("raw download request failed: %v", err)
+	}
+	defer rawResp.Body.Close()
+
+	if rawResp.StatusCode != 200 {
+		t.Fatalf("raw download returned %d", rawResp.StatusCode)
+	}
+
+	downloaded, _ := io.ReadAll(rawResp.Body)
+	if string(downloaded) != "ciphertext-bytes" {
+		t.Fatalf("expected 'ciphertext-bytes', got %q", string(downloaded))
 	}
 }
 
 func TestDownloadNotFound(t *testing.T) {
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /d/{token}", handleDownload)
+	mux.HandleFunc("GET /d/{token}", handleDownloadPage)
+	mux.HandleFunc("GET /raw/{token}", handleRawDownload)
 	server := httptest.NewServer(mux)
 	defer server.Close()
 
 	resp, _ := http.Get(server.URL + "/d/nonexistent")
 	if resp.StatusCode != 404 {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
+	}
+
+	rawResp, _ := http.Get(server.URL + "/raw/nonexistent")
+	if rawResp.StatusCode != 404 {
+		t.Fatalf("expected 404, got %d", rawResp.StatusCode)
 	}
 }

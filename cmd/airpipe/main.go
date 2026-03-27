@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"flag"
@@ -95,18 +97,37 @@ func cmdSend(relay string, files []string) error {
 		fmt.Printf("  File: %s (%s)\n\n", filename, fmtBytes(stat.Size()))
 	}
 
+	// Encrypt the file: [4-byte filename len][filename][content]
+	fmt.Print("  Encrypting...\n")
+	plaintext, err := os.ReadFile(uploadPath)
+	if err != nil {
+		return fmt.Errorf("read failed: %w", err)
+	}
+
+	key, _ := crypto.GenerateKey()
+	fnBytes := []byte(filename)
+	payload := &bytes.Buffer{}
+	binary.Write(payload, binary.BigEndian, uint32(len(fnBytes)))
+	payload.Write(fnBytes)
+	payload.Write(plaintext)
+
+	ciphertext, err := crypto.Encrypt(payload.Bytes(), key)
+	if err != nil {
+		return fmt.Errorf("encryption failed: %w", err)
+	}
+
 	fmt.Print("  Uploading...\n\n")
 
 	httpRelay := toHTTP(relay)
-	token, err := uploadFile(httpRelay, uploadPath, filename)
+	token, err := uploadEncrypted(httpRelay, ciphertext)
 	if err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/d/%s", httpRelay, token)
+	url := fmt.Sprintf("%s/d/%s#%s", httpRelay, token, crypto.KeyToBase64(key))
 	qr.GenerateTerminal(url)
 	fmt.Printf("\n  %s\n\n", url)
-	fmt.Print("  Expires in 10 minutes. Works with wget/curl.\n\n")
+	fmt.Print("  E2E encrypted. Expires in 10 minutes.\n\n")
 
 	return nil
 }
@@ -138,32 +159,25 @@ func cmdReceive(relay, destDir string) error {
 	return nil
 }
 
-func uploadFile(baseURL, filePath, filename string) (string, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	stat, _ := file.Stat()
-	fileSize := stat.Size()
-
+func uploadEncrypted(baseURL string, ciphertext []byte) (string, error) {
 	pr, pw := io.Pipe()
 	mw := multipart.NewWriter(pw)
 
+	total := int64(len(ciphertext))
 	errCh := make(chan error, 1)
 	go func() {
-		part, err := mw.CreateFormFile("file", filename)
+		part, err := mw.CreateFormFile("file", "encrypted.bin")
 		if err != nil {
 			pw.CloseWithError(err)
 			errCh <- err
 			return
 		}
 
+		reader := bytes.NewReader(ciphertext)
 		buf := make([]byte, 32*1024)
 		var written int64
 		for {
-			n, readErr := file.Read(buf)
+			n, readErr := reader.Read(buf)
 			if n > 0 {
 				if _, writeErr := part.Write(buf[:n]); writeErr != nil {
 					pw.CloseWithError(writeErr)
@@ -171,7 +185,7 @@ func uploadFile(baseURL, filePath, filename string) (string, error) {
 					return
 				}
 				written += int64(n)
-				progress(written, fileSize)
+				progress(written, total)
 			}
 			if readErr == io.EOF {
 				break

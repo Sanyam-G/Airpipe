@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AirPipe</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui;background:#0a0a0a;color:#fff;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.container{max-width:400px;width:100%;text-align:center}
+.logo{font-size:2rem;font-weight:700;margin-bottom:2rem;color:#00d4ff}
+.card{background:#151515;border-radius:16px;padding:2rem;border:1px solid #252525}
+.status{font-size:1.1rem;margin-bottom:1.5rem;color:#ccc}
+.filename{font-family:monospace;background:#0a0a0a;padding:0.75rem;border-radius:8px;margin-bottom:1.5rem;color:#00d4ff}
+.spinner{width:40px;height:40px;border:3px solid #252525;border-top-color:#00d4ff;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hidden{display:none}
+.success{color:#44ff88}
+.error{color:#ff4444}
+.badge{display:inline-block;background:rgba(68,255,136,0.1);color:#44ff88;padding:0.5rem 1rem;border-radius:20px;font-size:0.8rem;margin-top:1.5rem}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="logo">AirPipe</div>
+<div class="card">
+<div id="loading"><div class="spinner"></div><div class="status">Downloading & decrypting...</div></div>
+<div id="complete" class="hidden"><div class="status success">&#10003; Decrypted</div><div class="filename" id="fname">-</div></div>
+<div id="error" class="hidden"><div class="status error">&#10007; Failed</div><div class="filename" id="errmsg">-</div></div>
+<div class="badge">&#128274; End-to-end encrypted</div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl-fast.min.js"></script>
+<script>
+const token=location.pathname.split('/').pop();
+const keyStr=location.hash.slice(1);
+if(!token||!keyStr){show('error','Invalid link');throw''}
+let key;
+try{key=b64decode(keyStr);if(key.length!==32)throw'';}catch(e){show('error','Invalid key');throw e}
+
+(async()=>{
+try{
+const resp=await fetch('/raw/'+token);
+if(!resp.ok){show('error','File not found or expired');return}
+const encrypted=new Uint8Array(await resp.arrayBuffer());
+if(encrypted.length<24){show('error','File too small');return}
+const nonce=encrypted.slice(0,24);
+const ciphertext=encrypted.slice(24);
+const decrypted=nacl.secretbox.open(ciphertext,nonce,key);
+if(!decrypted){show('error','Decryption failed - wrong key?');return}
+// Parse: [4-byte filename len][filename][content]
+const fnLen=(decrypted[0]<<24)|(decrypted[1]<<16)|(decrypted[2]<<8)|decrypted[3];
+const filename=new TextDecoder().decode(decrypted.slice(4,4+fnLen));
+const content=decrypted.slice(4+fnLen);
+document.getElementById('fname').textContent=filename;
+show('complete');
+const blob=new Blob([content]);
+const a=document.createElement('a');
+a.href=URL.createObjectURL(blob);
+a.download=filename;
+a.click();
+}catch(e){show('error',e.message||'Download failed')}
+})();
+
+function show(id,msg){
+document.getElementById('loading').classList.add('hidden');
+document.getElementById('complete').classList.add('hidden');
+document.getElementById('error').classList.add('hidden');
+document.getElementById(id).classList.remove('hidden');
+if(msg&&id==='error')document.getElementById('errmsg').textContent=msg;
+}
+function b64decode(s){s=s.replace(/-/g,'+').replace(/_/g,'/');while(s.length%4)s+='=';const b=atob(s);const r=new Uint8Array(b.length);for(let i=0;i<b.length;i++)r[i]=b.charCodeAt(i);return r}
+</script>
+</body>
+</html>
