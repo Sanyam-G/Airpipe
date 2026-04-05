@@ -23,13 +23,32 @@ import (
 
 const defaultRelay = "https://airpipe.sanyamgarg.com"
 
+// ANSI escape codes
+const (
+	colorCyan  = "\033[36m"
+	colorGreen = "\033[32m"
+	colorRed   = "\033[31m"
+	colorDim   = "\033[2m"
+	colorBold  = "\033[1m"
+	colorReset = "\033[0m"
+)
+
+func banner(mode string) {
+	fmt.Fprintf(os.Stderr, "\n  %s%s    _   _     %s___  _          %s\n", colorBold, colorCyan, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s   /_\\ (_)_ _|%s _ \\(_)_ __  ___  %s\n", colorBold, colorCyan, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s  / _ \\| | '_|%s  _/| | '_ \\/ -_) %s\n", colorBold, colorCyan, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s /_/ \\_\\_|_| |%s_|  |_| .__/\\___| %s\n", colorBold, colorCyan, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s             %s      |_|    %s%s%s\n\n", colorBold, colorCyan, colorReset, colorDim, mode, colorReset)
+}
+
 func main() {
 	relay := flag.String("relay", defaultRelay, "Relay server URL")
 	flag.Parse()
 	args := flag.Args()
 
 	if len(args) < 1 {
-		fmt.Println("Usage: airpipe send <file> [file2...] | airpipe receive [dir]")
+		fmt.Printf("Usage: %sairpipe%s send <file> [file2...] | %sairpipe%s receive [dir]\n",
+			colorBold, colorReset, colorBold, colorReset)
 		os.Exit(1)
 	}
 
@@ -53,7 +72,7 @@ func main() {
 	}
 
 	if err != nil {
-		fmt.Printf("\n  ✗ Error: %v\n\n", err)
+		fmt.Fprintf(os.Stderr, "\n  %s✗ Error: %v%s\n\n", colorRed, err, colorReset)
 		os.Exit(1)
 	}
 }
@@ -75,8 +94,8 @@ func cmdSend(relay string, files []string) error {
 
 	var uploadPath, filename string
 	if needsZip {
-		fmt.Print("\n  AirPipe - Send\n\n")
-		fmt.Printf("  Zipping %d items...\n", len(files))
+		banner("send")
+		fmt.Printf("  Zipping %d items...", len(files))
 
 		zipPath, err := archive.ZipPaths(files)
 		if err != nil {
@@ -87,18 +106,18 @@ func cmdSend(relay string, files []string) error {
 		filename = "airpipe-transfer.zip"
 
 		stat, _ := os.Stat(zipPath)
-		fmt.Printf("  Archive: %s\n\n", fmtBytes(stat.Size()))
+		fmt.Printf("\r  Zipped %d items %s✓%s  %s(%s)%s\n", len(files), colorGreen, colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
 	} else {
 		uploadPath = files[0]
 		filename = filepath.Base(files[0])
 		stat, _ := os.Stat(uploadPath)
 
-		fmt.Print("\n  AirPipe - Send\n\n")
-		fmt.Printf("  File: %s (%s)\n\n", filename, fmtBytes(stat.Size()))
+		banner("send")
+		fmt.Printf("  %s%s%s  %s%s%s\n", colorBold, filename, colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
 	}
 
 	// Encrypt the file: [4-byte filename len][filename][content]
-	fmt.Print("  Encrypting...\n")
+	fmt.Print("  Encrypting...")
 	plaintext, err := os.ReadFile(uploadPath)
 	if err != nil {
 		return fmt.Errorf("read failed: %w", err)
@@ -116,6 +135,7 @@ func cmdSend(relay string, files []string) error {
 		return fmt.Errorf("encryption failed: %w", err)
 	}
 
+	fmt.Printf("\r  Encrypted %s✓%s\n", colorGreen, colorReset)
 	fmt.Print("  Uploading...\n\n")
 
 	httpRelay := toHTTP(relay)
@@ -126,8 +146,8 @@ func cmdSend(relay string, files []string) error {
 
 	url := fmt.Sprintf("%s/d/%s#%s", httpRelay, token, crypto.KeyToBase64(key))
 	qr.GenerateTerminal(url)
-	fmt.Printf("\n  %s\n\n", url)
-	fmt.Print("  E2E encrypted. Expires in 10 minutes.\n\n")
+	fmt.Printf("\n  %s%s%s\n\n", colorCyan, url, colorReset)
+	fmt.Printf("  %sE2E encrypted. Expires in 10 minutes.%s\n\n", colorDim, colorReset)
 
 	return nil
 }
@@ -140,10 +160,10 @@ func cmdReceive(relay, destDir string) error {
 	httpRelay := toHTTP(relay)
 	url := fmt.Sprintf("%s/u/%s#%s", httpRelay, token, crypto.KeyToBase64(key))
 
-	fmt.Print("\n  AirPipe - Receive\n\n")
-	fmt.Printf("  Destination: %s\n\n", destDir)
+	banner("receive")
+	fmt.Printf("  Destination: %s%s%s\n\n", colorBold, destDir, colorReset)
 	qr.GenerateTerminal(url)
-	fmt.Printf("\n  %s\n\n  Waiting...\n\n", url)
+	fmt.Printf("\n  %s%s%s\n\n  %sWaiting for sender...%s\n\n", colorCyan, url, colorReset, colorDim, colorReset)
 
 	receiver := transfer.NewReceiver(wsRelay, token, key)
 	if err := receiver.Connect(); err != nil {
@@ -155,7 +175,7 @@ func cmdReceive(relay, destDir string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n  ✓ Saved: %s\n\n", savedPath)
+	fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
 	return nil
 }
 
@@ -225,7 +245,7 @@ func uploadEncrypted(baseURL string, ciphertext []byte) (string, error) {
 	}
 	json.NewDecoder(resp.Body).Decode(&result)
 
-	fmt.Print("\r  ✓ Uploaded                                      \n\n")
+	fmt.Printf("\r  %s✓ Uploaded%s                                      \n\n", colorGreen, colorReset)
 	return result.Token, nil
 }
 
@@ -262,6 +282,6 @@ func progress(sent, total int64) {
 	if filled > 40 {
 		filled = 40
 	}
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", 40-filled)
-	fmt.Fprintf(os.Stderr, "\r  [%s] %3.0f%% %s/%s", bar, pct, fmtBytes(sent), fmtBytes(total))
+	bar := colorCyan + strings.Repeat("█", filled) + colorReset + strings.Repeat("░", 40-filled)
+	fmt.Fprintf(os.Stderr, "\r  [%s] %3.0f%% %s%s/%s%s", bar, pct, colorDim, fmtBytes(sent), fmtBytes(total), colorReset)
 }
