@@ -104,7 +104,7 @@ func (fs *FileStore) cleanupLoop() {
 }
 
 func genToken() string {
-	b := make([]byte, 3)
+	b := make([]byte, 8)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }

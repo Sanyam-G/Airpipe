@@ -230,7 +230,7 @@ func uploadEncrypted(baseURL string, ciphertext []byte) (string, error) {
 }
 
 func genToken() string {
-	b := make([]byte, 3)
+	b := make([]byte, 8)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }
