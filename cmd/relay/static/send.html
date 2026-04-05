@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AIRPIPE / SEND</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'JetBrains Mono',monospace;
+  background:#000;color:#fff;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:24px;
+  background-image:radial-gradient(rgba(255,255,255,0.04) 1px,transparent 1px);
+  background-size:20px 20px;
+}
+a{color:#00d4ff;text-decoration:none}
+a:hover{text-decoration:underline}
+
+.container{max-width:480px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:24px}
+.logo{font-size:1.5rem;font-weight:700;letter-spacing:4px;text-transform:uppercase}
+.logo span{color:#00d4ff}
+.logo a{color:inherit;text-decoration:none}
+.logo a:hover span{text-decoration:underline}
+
+.card{
+  width:100%;background:#000;
+  border:1px dotted #333;padding:24px;
+}
+
+.section-label{font-size:0.6rem;color:#555;text-transform:uppercase;letter-spacing:2px;margin-bottom:12px}
+
+/* Drop zone */
+.drop-zone{
+  border:2px dotted #333;padding:48px 24px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  transition:border-color 0.15s,background 0.15s;
+  min-height:180px;justify-content:center;
+}
+.drop-zone:hover,.drop-zone.dragover{border-color:#00d4ff;background:rgba(255,77,0,0.03)}
+.drop-icon{font-size:0.8rem;color:#555;text-transform:uppercase;letter-spacing:2px}
+.drop-label{font-size:0.85rem;color:#888}
+.drop-label strong{color:#00d4ff;cursor:pointer}
+.drop-hint{font-size:0.6rem;color:#444;text-transform:uppercase;letter-spacing:1px}
+input[type=file]{display:none}
+
+/* Progress */
+.progress-wrap{width:100%;margin:8px 0}
+.progress-bar{background:#111;border:1px dotted #333;height:6px;overflow:hidden}
+.progress-fill{height:100%;background:#00d4ff;width:0%;transition:width 0.15s}
+.progress-text{font-size:0.7rem;color:#555;margin-top:6px;font-variant-numeric:tabular-nums}
+.status{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:4px}
+.filename{font-size:0.75rem;color:#ccc;background:#0a0a0a;border:1px dotted #222;padding:8px 12px;word-break:break-all;margin:8px 0}
+
+/* Done state */
+.qr-wrap{margin:12px 0}
+.qr-wrap canvas,.qr-wrap table{margin:0 auto}
+.url-box{
+  font-size:0.65rem;color:#ccc;background:#0a0a0a;border:1px dotted #222;
+  padding:10px 12px;word-break:break-all;cursor:pointer;
+  position:relative;transition:border-color 0.15s;text-align:left;
+}
+.url-box:hover{border-color:#00d4ff}
+.copy-badge{
+  position:absolute;top:50%;right:10px;transform:translateY(-50%);
+  font-size:0.55rem;color:#00d4ff;text-transform:uppercase;letter-spacing:1px;
+  opacity:0;transition:opacity 0.2s;
+}
+.copy-badge.show{opacity:1}
+.expiry{font-size:0.6rem;color:#444;text-transform:uppercase;letter-spacing:1px;margin-top:8px}
+
+.hidden{display:none}
+
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px dotted #333;color:#555;
+  padding:6px 12px;font-size:0.6rem;
+  text-transform:uppercase;letter-spacing:1px;
+}
+.badge svg{width:10px;height:10px;fill:currentColor}
+
+.footer{font-size:0.6rem;color:#333;text-transform:uppercase;letter-spacing:1px}
+.footer a{color:#444}
+.footer a:hover{color:#00d4ff}
+
+@media(max-width:540px){
+  .drop-zone{padding:32px 16px;min-height:140px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="logo"><a href="/">AIR<span>PIPE</span></a> / SEND</div>
+
+  <div class="card">
+
+    <div id="select">
+      <div class="section-label">select file</div>
+      <div class="drop-zone" id="dropzone">
+        <div class="drop-icon">+</div>
+        <div class="drop-label">drop file or <strong id="select-btn">select</strong></div>
+        <div class="drop-hint">max 500 MB / expires in 10 min</div>
+      </div>
+      <input type="file" id="fileinput">
+    </div>
+
+    <div id="encrypting" class="hidden">
+      <div class="status">encrypting...</div>
+      <div class="filename" id="enc-name">-</div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="enc-progress"></div></div>
+        <div class="progress-text" id="enc-text">preparing payload</div>
+      </div>
+    </div>
+
+    <div id="uploading" class="hidden">
+      <div class="status">uploading...</div>
+      <div class="filename" id="up-name">-</div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="up-progress"></div></div>
+        <div class="progress-text" id="up-text">0%</div>
+      </div>
+    </div>
+
+    <div id="done" class="hidden">
+      <div class="status" style="color:#00d4ff">ready to share</div>
+      <div class="qr-wrap" id="qr"></div>
+      <div class="url-box" id="url-box" onclick="copyURL()">
+        <span id="share-url">-</span>
+        <span class="copy-badge" id="copy-badge">copied</span>
+      </div>
+      <div class="expiry">expires in 10 minutes</div>
+    </div>
+
+    <div id="error" class="hidden">
+      <div class="status" style="color:#00d4ff">error</div>
+      <div class="filename" id="errmsg">-</div>
+    </div>
+
+  </div>
+
+  <div class="badge">
+    <svg viewBox="0 0 16 16"><path d="M8 1a4 4 0 0 0-4 4v3H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V5a4 4 0 0 0-4-4zm2 7H6V5a2 2 0 1 1 4 0v3z"/></svg>
+    end-to-end encrypted
+  </div>
+
+  <div class="footer">built by <a href="https://sanyamgarg.com" target="_blank">sanyam garg</a></div>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl-fast.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script>
+const dropzone=document.getElementById('dropzone');
+const fileinput=document.getElementById('fileinput');
+
+document.getElementById('select-btn').addEventListener('click',(e)=>{e.stopPropagation();fileinput.click()});
+dropzone.addEventListener('click',()=>fileinput.click());
+fileinput.addEventListener('change',(e)=>{if(e.target.files.length)handleFile(e.target.files[0])});
+dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
+dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop',(e)=>{
+  e.preventDefault();dropzone.classList.remove('dragover');
+  if(e.dataTransfer.files.length)handleFile(e.dataTransfer.files[0]);
+});
+
+function show(id){
+  ['select','encrypting','uploading','done','error'].forEach(x=>document.getElementById(x).classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function showError(msg){show('error');document.getElementById('errmsg').textContent=msg}
+
+function b64encode(bytes){
+  let binary='';
+  for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+function formatSize(bytes){
+  if(bytes===0)return '0 B';
+  const units=['B','KB','MB','GB'];
+  const i=Math.floor(Math.log(bytes)/Math.log(1024));
+  return (bytes/Math.pow(1024,i)).toFixed(i===0?0:1)+' '+units[i];
+}
+
+let shareURL='';
+function copyURL(){
+  navigator.clipboard.writeText(shareURL);
+  const badge=document.getElementById('copy-badge');
+  badge.classList.add('show');
+  setTimeout(()=>badge.classList.remove('show'),1500);
+}
+
+async function handleFile(file){
+  try{
+    // Encrypt
+    show('encrypting');
+    document.getElementById('enc-name').textContent=file.name;
+    document.getElementById('enc-progress').style.width='10%';
+    document.getElementById('enc-text').textContent='reading file...';
+
+    const arrayBuf=await file.arrayBuffer();
+    const fileBytes=new Uint8Array(arrayBuf);
+
+    document.getElementById('enc-progress').style.width='30%';
+    document.getElementById('enc-text').textContent='building payload...';
+
+    // Build payload: [4-byte filename len][filename bytes][file content]
+    const fnBytes=new TextEncoder().encode(file.name);
+    const fnLen=fnBytes.length;
+    const payload=new Uint8Array(4+fnLen+fileBytes.length);
+    payload[0]=(fnLen>>24)&0xff;
+    payload[1]=(fnLen>>16)&0xff;
+    payload[2]=(fnLen>>8)&0xff;
+    payload[3]=fnLen&0xff;
+    payload.set(fnBytes,4);
+    payload.set(fileBytes,4+fnLen);
+
+    document.getElementById('enc-progress').style.width='60%';
+    document.getElementById('enc-text').textContent='encrypting with NaCl...';
+
+    // Generate key and encrypt
+    const key=nacl.randomBytes(32);
+    const nonce=nacl.randomBytes(24);
+    const ciphertext=nacl.secretbox(payload,nonce,key);
+
+    // Prepend nonce
+    const encrypted=new Uint8Array(24+ciphertext.length);
+    encrypted.set(nonce);
+    encrypted.set(ciphertext,24);
+
+    document.getElementById('enc-progress').style.width='100%';
+    document.getElementById('enc-text').textContent='encrypted '+formatSize(encrypted.length);
+
+    // Upload
+    show('uploading');
+    document.getElementById('up-name').textContent=file.name+' (encrypted)';
+
+    const formData=new FormData();
+    formData.append('file',new Blob([encrypted]),'encrypted.bin');
+
+    const xhr=new XMLHttpRequest();
+    xhr.open('POST','/upload');
+
+    xhr.upload.addEventListener('progress',(e)=>{
+      if(e.lengthComputable){
+        const pct=Math.round(e.loaded/e.total*100);
+        document.getElementById('up-progress').style.width=pct+'%';
+        document.getElementById('up-text').textContent=pct+'% \u00b7 '+formatSize(e.loaded)+' / '+formatSize(e.total);
+      }
+    });
+
+    xhr.onload=()=>{
+      if(xhr.status!==200){showError('Upload failed: '+xhr.statusText);return}
+      let resp;
+      try{resp=JSON.parse(xhr.responseText)}catch(e){showError('Invalid server response');return}
+
+      const keyB64=b64encode(key);
+      shareURL=location.origin+'/d/'+resp.token+'#'+keyB64;
+
+      document.getElementById('share-url').textContent=shareURL;
+
+      // Generate QR
+      const qr=qrcode(0,'M');
+      qr.addData(shareURL);
+      qr.make();
+      const qrEl=document.getElementById('qr');
+      const modules=qr.getModuleCount();
+      const cellSize=Math.max(3,Math.floor(240/modules));
+      const canvas=document.createElement('canvas');
+      const size=modules*cellSize;
+      canvas.width=size;canvas.height=size;
+      const ctx=canvas.getContext('2d');
+      ctx.fillStyle='#000';ctx.fillRect(0,0,size,size);
+      for(let r=0;r<modules;r++){
+        for(let c=0;c<modules;c++){
+          if(qr.isDark(r,c)){ctx.fillStyle='#00d4ff'}else{ctx.fillStyle='#000'}
+          ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize);
+        }
+      }
+      qrEl.innerHTML='';
+      qrEl.appendChild(canvas);
+
+      show('done');
+    };
+
+    xhr.onerror=()=>showError('Upload failed. Check connection.');
+    xhr.send(formData);
+
+  }catch(e){
+    showError(e.message||'Encryption failed');
+  }
+}
+</script>
+</body>
+</html>

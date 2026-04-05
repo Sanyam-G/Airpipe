@@ -3,112 +3,147 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>AirPipe - Upload</title>
+<title>AIRPIPE / UPLOAD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,system-ui,'Segoe UI',sans-serif;background:#0a0a0a;color:#fff;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px}
-.container{max-width:420px;width:100%;text-align:center}
-.logo{font-size:1.75rem;font-weight:700;margin-bottom:2rem;letter-spacing:-0.5px}
+body{
+  font-family:'JetBrains Mono',monospace;
+  background:#000;color:#fff;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:24px;
+  background-image:radial-gradient(rgba(255,255,255,0.04) 1px,transparent 1px);
+  background-size:20px 20px;
+}
+a{color:#00d4ff;text-decoration:none}
+a:hover{text-decoration:underline}
+
+.container{max-width:480px;width:100%;text-align:center;display:flex;flex-direction:column;align-items:center;gap:24px}
+.logo{font-size:1.5rem;font-weight:700;letter-spacing:4px;text-transform:uppercase}
 .logo span{color:#00d4ff}
-.card{background:#111;border-radius:16px;padding:2rem;border:1px solid #1e1e1e;box-shadow:0 0 0 1px rgba(255,255,255,0.03),0 8px 40px rgba(0,0,0,0.4)}
-.status{font-size:0.95rem;margin-bottom:0.5rem;color:#888;font-weight:500}
-.status-detail{font-size:0.8rem;color:#555;margin-bottom:1.25rem}
+.logo a{color:inherit;text-decoration:none}
+.logo a:hover span{text-decoration:underline}
 
-.upload-zone{
-  border:2px dashed #2a2a2a;border-radius:14px;padding:2.5rem 1.5rem;cursor:pointer;
-  margin-bottom:1rem;transition:all 0.2s ease;
-  display:flex;flex-direction:column;align-items:center;gap:0.75rem;
-  min-height:160px;justify-content:center;
+.card{
+  width:100%;background:#000;
+  border:1px dotted #333;padding:24px;
 }
-.upload-zone:hover,.upload-zone.dragover{
-  border-color:#00d4ff;background:rgba(0,212,255,0.04);
-}
-.upload-zone.dragover{transform:scale(1.01)}
-.upload-icon{font-size:2rem;opacity:0.6;transition:opacity 0.2s}
-.upload-zone:hover .upload-icon,.upload-zone.dragover .upload-icon{opacity:1}
-.upload-label{font-size:0.9rem;color:#666;font-weight:500}
-.upload-label strong{color:#00d4ff}
-.upload-hint{font-size:0.7rem;color:#444}
 
-.filename{font-family:'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;font-size:0.85rem;background:#0a0a0a;padding:0.75rem 1rem;border-radius:10px;margin-bottom:1rem;color:#e0e0e0;border:1px solid #1e1e1e;word-break:break-all}
-.progress-wrap{margin-bottom:1rem}
-.progress-bar{background:#1a1a1a;border-radius:6px;height:4px;overflow:hidden;margin-bottom:0.5rem}
-.progress-fill{height:100%;background:linear-gradient(90deg,#00d4ff,#7b61ff);width:0%;transition:width 0.15s ease;border-radius:6px}
-.progress-text{font-size:0.75rem;color:#555;font-variant-numeric:tabular-nums}
-.speed-info{font-size:0.75rem;color:#444;margin-top:0.25rem;font-variant-numeric:tabular-nums}
-.size-info{font-size:0.8rem;color:#555;margin-bottom:1rem;font-variant-numeric:tabular-nums}
-.file-icon{font-size:2.5rem;margin-bottom:1rem;line-height:1}
-.hidden{display:none}
-.success{color:#34d399}
-.error-text{color:#f87171}
-.badge{display:inline-flex;align-items:center;gap:6px;background:rgba(0,212,255,0.06);color:#00d4ff;padding:0.4rem 0.85rem;border-radius:20px;font-size:0.7rem;margin-top:1.5rem;font-weight:500;letter-spacing:0.2px}
-.badge svg{width:12px;height:12px;fill:currentColor}
-.footer{margin-top:2.5rem;font-size:0.7rem;color:#333}
-.footer a{color:#444;text-decoration:none;transition:color 0.2s}
-.footer a:hover{color:#00d4ff}
+.status{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+.status-detail{font-size:0.65rem;color:#444;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px}
+
+/* Drop zone */
+.drop-zone{
+  border:2px dotted #333;padding:48px 24px;cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:12px;
+  transition:border-color 0.15s,background 0.15s;
+  min-height:180px;justify-content:center;
+}
+.drop-zone:hover,.drop-zone.dragover{border-color:#00d4ff;background:rgba(255,77,0,0.03)}
+.drop-icon{font-size:0.8rem;color:#555;text-transform:uppercase;letter-spacing:2px}
+.drop-label{font-size:0.85rem;color:#888}
+.drop-label strong{color:#00d4ff;cursor:pointer}
+.drop-hint{font-size:0.6rem;color:#444;text-transform:uppercase;letter-spacing:1px}
 input[type=file]{display:none}
 
-@keyframes pulse{0%,100%{opacity:0.4}50%{opacity:1}}
-.loading-dots{display:flex;gap:4px;justify-content:center;margin:1rem auto 0.75rem}
-.loading-dots span{width:6px;height:6px;background:#00d4ff;border-radius:50%;animation:pulse 1.4s ease-in-out infinite}
-.loading-dots span:nth-child(2){animation-delay:0.2s}
-.loading-dots span:nth-child(3){animation-delay:0.4s}
+.filename{font-size:0.75rem;color:#ccc;background:#0a0a0a;border:1px dotted #222;padding:8px 12px;word-break:break-all;margin:8px 0}
+.size-info{font-size:0.7rem;color:#555;font-variant-numeric:tabular-nums;margin-bottom:8px}
+
+.progress-wrap{width:100%;margin:8px 0}
+.progress-bar{background:#111;border:1px dotted #333;height:6px;overflow:hidden}
+.progress-fill{height:100%;background:#00d4ff;width:0%;transition:width 0.15s}
+.progress-text{font-size:0.7rem;color:#555;margin-top:6px;font-variant-numeric:tabular-nums}
+.speed-info{font-size:0.65rem;color:#444;margin-top:4px;font-variant-numeric:tabular-nums}
+
+.checkmark{font-size:2rem;color:#00d4ff;margin-bottom:8px;line-height:1}
+
+.hidden{display:none}
+
+/* Connecting dots */
+@keyframes blink{0%,100%{opacity:0.2}50%{opacity:1}}
+.dots{display:flex;gap:6px;justify-content:center;margin:12px 0}
+.dots span{width:4px;height:4px;background:#00d4ff;animation:blink 1.4s ease-in-out infinite}
+.dots span:nth-child(2){animation-delay:0.2s}
+.dots span:nth-child(3){animation-delay:0.4s}
+
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  border:1px dotted #333;color:#555;
+  padding:6px 12px;font-size:0.6rem;
+  text-transform:uppercase;letter-spacing:1px;
+}
+.badge svg{width:10px;height:10px;fill:currentColor}
+
+.footer{font-size:0.6rem;color:#333;text-transform:uppercase;letter-spacing:1px}
+.footer a{color:#444}
+.footer a:hover{color:#00d4ff}
+
+@media(max-width:540px){
+  .drop-zone{padding:32px 16px;min-height:140px}
+}
 </style>
 </head>
 <body>
 <div class="container">
-<div class="logo">Air<span>Pipe</span></div>
-<div class="card">
 
-<div id="connecting">
-<div class="loading-dots"><span></span><span></span><span></span></div>
-<div class="status">Connecting...</div>
-<div class="status-detail">Establishing encrypted channel</div>
-</div>
+  <div class="logo"><a href="/">AIR<span>PIPE</span></a> / UPLOAD</div>
 
-<div id="select" class="hidden">
-<div class="status">Ready to send</div>
-<div class="status-detail">File will be encrypted before transfer</div>
-<div class="upload-zone" id="dropzone">
-<div class="upload-icon">📂</div>
-<div class="upload-label">Tap to select or <strong>drop a file</strong></div>
-<div class="upload-hint">Any file type, any size</div>
-</div>
-<input type="file" id="fileinput">
-</div>
+  <div class="card">
 
-<div id="sending" class="hidden">
-<div class="status">Uploading</div>
-<div class="filename" id="filename">-</div>
-<div class="size-info" id="send-size"></div>
-<div class="progress-wrap">
-<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
-<div class="progress-text" id="ptext">0%</div>
-</div>
-<div class="speed-info" id="speed"></div>
-</div>
+    <div id="connecting">
+      <div class="status">connecting...</div>
+      <div class="status-detail">establishing encrypted channel</div>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
 
-<div id="complete" class="hidden">
-<div class="file-icon">✅</div>
-<div class="status success">Transfer complete</div>
-<div class="filename" id="done-name">-</div>
-<div class="size-info" id="done-size"></div>
-</div>
+    <div id="select" class="hidden">
+      <div class="status">ready</div>
+      <div class="status-detail">file will be encrypted before transfer</div>
+      <div class="drop-zone" id="dropzone">
+        <div class="drop-icon">+</div>
+        <div class="drop-label">tap to select or <strong>drop a file</strong></div>
+        <div class="drop-hint">any file type, any size</div>
+      </div>
+      <input type="file" id="fileinput">
+    </div>
 
-<div id="error" class="hidden">
-<div class="file-icon">⚠️</div>
-<div class="status error-text">Transfer failed</div>
-<div class="filename" id="errmsg">-</div>
-</div>
+    <div id="sending" class="hidden">
+      <div class="status">uploading</div>
+      <div class="filename" id="filename">-</div>
+      <div class="size-info" id="send-size"></div>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+        <div class="progress-text" id="ptext">0%</div>
+      </div>
+      <div class="speed-info" id="speed"></div>
+    </div>
 
-<div class="badge">
-<svg viewBox="0 0 16 16"><path d="M8 1a4 4 0 0 0-4 4v3H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V5a4 4 0 0 0-4-4zm2 7H6V5a2 2 0 1 1 4 0v3z"/></svg>
-End-to-end encrypted
-</div>
-</div>
-</div>
+    <div id="complete" class="hidden">
+      <div class="checkmark">&check;</div>
+      <div class="status" style="color:#00d4ff">transfer complete</div>
+      <div class="filename" id="done-name">-</div>
+      <div class="size-info" id="done-size"></div>
+    </div>
 
-<div class="footer">powered by <a href="https://github.com/Sanyam-G/Airpipe" target="_blank">AirPipe</a></div>
+    <div id="error" class="hidden">
+      <div class="status" style="color:#00d4ff">error</div>
+      <div class="filename" id="errmsg">-</div>
+    </div>
+
+  </div>
+
+  <div class="badge">
+    <svg viewBox="0 0 16 16"><path d="M8 1a4 4 0 0 0-4 4v3H3a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1h-1V5a4 4 0 0 0-4-4zm2 7H6V5a2 2 0 1 1 4 0v3z"/></svg>
+    end-to-end encrypted
+  </div>
+
+  <div class="footer">built by <a href="https://sanyamgarg.com" target="_blank">sanyam garg</a></div>
+
+</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl-fast.min.js"></script>
 <script>
@@ -181,7 +216,6 @@ async function sendFile(file){
     ws.send(encrypt(encode(0x10,new Uint8Array(chunk)),keyBytes));
     offset=end;
 
-    // Use rAF for UI updates instead of setTimeout
     const now=performance.now();
     if(now-lastUIUpdate>50||offset>=file.size){
       lastUIUpdate=now;

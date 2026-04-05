@@ -329,12 +329,40 @@ func handleUploadPage(w http.ResponseWriter, r *http.Request) {
 	w.Write(content)
 }
 
+func handleLandingPage(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	staticFS, _ := fs.Sub(staticFiles, "static")
+	content, err := fs.ReadFile(staticFS, "index.html")
+	if err != nil {
+		http.Error(w, "page not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
+}
+
+func handleSendPage(w http.ResponseWriter, r *http.Request) {
+	staticFS, _ := fs.Sub(staticFiles, "static")
+	content, err := fs.ReadFile(staticFS, "send.html")
+	if err != nil {
+		http.Error(w, "page not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
+}
+
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /", handleLandingPage)
+	mux.HandleFunc("GET /send", handleSendPage)
 	mux.HandleFunc("POST /upload", handleUploadFile)
 	mux.HandleFunc("GET /d/{token}", handleDownloadPage)
 	mux.HandleFunc("GET /raw/{token}", handleRawDownload)

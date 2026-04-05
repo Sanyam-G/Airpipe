@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AIRPIPE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'JetBrains Mono',monospace;
+  background:#000;color:#fff;
+  min-height:100vh;min-height:100dvh;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  padding:24px;
+  background-image:radial-gradient(rgba(255,255,255,0.04) 1px,transparent 1px);
+  background-size:20px 20px;
+}
+a{color:#00d4ff;text-decoration:none}
+a:hover{text-decoration:underline}
+
+.page{max-width:640px;width:100%;display:flex;flex-direction:column;align-items:center;gap:32px}
+
+.hero{text-align:center;display:flex;flex-direction:column;align-items:center;gap:12px}
+.hero h1{font-size:3rem;font-weight:700;letter-spacing:8px;text-transform:uppercase}
+.hero h1 span{color:#00d4ff}
+.tagline{font-size:0.8rem;color:#888;text-transform:uppercase;letter-spacing:2px}
+
+.features{
+  display:grid;grid-template-columns:repeat(3,1fr);gap:1px;
+  width:100%;background:#333;border:1px dotted #333;
+}
+.feat{background:#000;padding:20px 16px;text-align:center;display:flex;flex-direction:column;gap:8px}
+.feat-label{font-size:0.65rem;color:#00d4ff;text-transform:uppercase;letter-spacing:2px;font-weight:500}
+.feat-desc{font-size:0.7rem;color:#666;line-height:1.5}
+
+.cta{
+  display:inline-block;
+  border:1px dotted #00d4ff;
+  color:#00d4ff;
+  padding:14px 32px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.85rem;
+  font-weight:700;
+  text-transform:uppercase;
+  letter-spacing:3px;
+  text-decoration:none;
+  transition:background 0.15s,color 0.15s;
+}
+.cta:hover{background:#00d4ff;color:#000;text-decoration:none}
+
+.install{width:100%;display:flex;flex-direction:column;gap:8px}
+.install-label{font-size:0.6rem;color:#555;text-transform:uppercase;letter-spacing:2px}
+.code-block{
+  background:#0a0a0a;border:1px dotted #222;
+  padding:12px 16px;font-size:0.75rem;color:#ccc;
+  cursor:pointer;position:relative;
+  word-break:break-all;white-space:pre-wrap;
+  transition:border-color 0.15s;
+}
+.code-block:hover{border-color:#00d4ff}
+.code-block .copied{
+  position:absolute;top:50%;right:12px;transform:translateY(-50%);
+  font-size:0.6rem;color:#00d4ff;text-transform:uppercase;letter-spacing:1px;
+  opacity:0;transition:opacity 0.2s;
+}
+.code-block .copied.show{opacity:1}
+
+.links{display:flex;gap:24px;font-size:0.7rem}
+.links a{color:#555;transition:color 0.15s}
+.links a:hover{color:#00d4ff}
+
+.footer{font-size:0.6rem;color:#333;text-transform:uppercase;letter-spacing:1px}
+.footer a{color:#444}
+.footer a:hover{color:#00d4ff}
+
+@media(max-width:540px){
+  .hero h1{font-size:2rem;letter-spacing:4px}
+  .features{grid-template-columns:1fr}
+  .page{gap:24px}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="hero">
+    <h1>AIR<span>PIPE</span></h1>
+    <div class="tagline">encrypted file transfer. no accounts. no apps.</div>
+  </div>
+
+  <div class="features">
+    <div class="feat">
+      <div class="feat-label">E2E encrypted</div>
+      <div class="feat-desc">Relay never sees your data. NaCl secretbox.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-label">Zero knowledge</div>
+      <div class="feat-desc">Key stays in URL fragment. Never hits the server.</div>
+    </div>
+    <div class="feat">
+      <div class="feat-label">Self-hostable</div>
+      <div class="feat-desc">Single Docker container. Your infra, your rules.</div>
+    </div>
+  </div>
+
+  <a href="/send" class="cta">[ send a file ]</a>
+
+  <div class="install">
+    <div class="install-label">install</div>
+    <div class="code-block" onclick="copyCode(this)">
+curl -sSL https://airpipe.sanyamgarg.com/install.sh | sh<span class="copied">copied</span>
+    </div>
+    <div class="code-block" onclick="copyCode(this)">
+go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest<span class="copied">copied</span>
+    </div>
+  </div>
+
+  <div class="links">
+    <a href="https://github.com/Sanyam-G/Airpipe" target="_blank">github.com/Sanyam-G/Airpipe</a>
+  </div>
+
+  <div class="footer">built by <a href="https://sanyamgarg.com" target="_blank">sanyam garg</a></div>
+
+</div>
+
+<script>
+function copyCode(el){
+  const text=el.textContent.replace('copied','').trim();
+  navigator.clipboard.writeText(text);
+  const badge=el.querySelector('.copied');
+  badge.classList.add('show');
+  setTimeout(()=>badge.classList.remove('show'),1500);
+}
+</script>
+</body>
+</html>
