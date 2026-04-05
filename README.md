@@ -1,6 +1,7 @@
 # AirPipe
 
-Transfer files between terminal and any device with a QR code. No apps. No accounts.
+Encrypted file transfer. No accounts. No apps.
+
 ```
 $ airpipe send config.yaml
 ```
@@ -9,12 +10,16 @@ $ airpipe send config.yaml
 
 Scan the QR, file downloads. Done.
 
-## Install
-```bash
-# Auto-detect OS/arch
-curl -sL https://raw.githubusercontent.com/Sanyam-G/Airpipe/main/install.sh | sh
+**Try it now:** [airpipe.sanyamgarg.com/send](https://airpipe.sanyamgarg.com/send) - send files from your browser, no install needed.
 
-# From source
+## Install
+
+```bash
+curl -sL https://raw.githubusercontent.com/Sanyam-G/Airpipe/main/install.sh | sh
+```
+
+Or from source:
+```bash
 go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest
 ```
 
@@ -30,26 +35,35 @@ airpipe send ./error.log
 airpipe send file1.txt file2.txt photos/
 ```
 
-**Receive file (phone to server):**
+**Receive a file (phone to server):**
 ```bash
 airpipe receive ./downloads
 ```
 
+**Send from browser (no CLI needed):**
+
+Go to [airpipe.sanyamgarg.com/send](https://airpipe.sanyamgarg.com/send), drop a file, share the link.
+
 ## How it works
 
-Both directions are end-to-end encrypted. The relay only sees ciphertext.
+Everything is end-to-end encrypted. The relay is zero-knowledge.
 
-**Send:** CLI encrypts file locally (NaCl secretbox), uploads ciphertext to relay, shows QR code. Encryption key lives in the URL fragment (`#...`) and never reaches the server. Browser decrypts on download.
+**Send:** CLI encrypts locally (NaCl secretbox), uploads ciphertext to relay, prints a QR code. The encryption key lives in the URL fragment (`#...`) and never reaches the server. Browser decrypts on download.
 
-**Receive:** CLI opens a WebSocket room, shows QR. Phone scans, selects file, encrypts in browser, streams through relay. CLI decrypts locally.
+**Receive:** CLI opens a WebSocket room and prints a QR. Phone scans, selects a file, encrypts in browser, streams chunks through relay. CLI decrypts locally.
 
-Files expire after 10 minutes. Relay is zero-knowledge.
+**Web send:** Browser generates a key, encrypts the file client-side, uploads ciphertext. Same zero-knowledge guarantee as the CLI.
 
-## Self-host relay
+Files expire after 10 minutes.
+
+## Self-host
+
 ```bash
 docker run -p 8080:8080 ghcr.io/sanyam-g/airpipe-relay
 airpipe --relay https://your-server:8080 send file.txt
 ```
+
+The relay serves the landing page, web send, and download pages. One container, everything included.
 
 ## License
 
