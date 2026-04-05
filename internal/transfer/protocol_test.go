@@ -114,6 +114,26 @@ func TestParseMetadataInvalid(t *testing.T) {
 	}
 }
 
+func TestNewVersionMessage(t *testing.T) {
+	msg := NewVersionMessage()
+	if msg.Type != MsgTypeVersion {
+		t.Fatalf("expected MsgTypeVersion, got %d", msg.Type)
+	}
+	if len(msg.Payload) != 1 || msg.Payload[0] != ProtocolVersion {
+		t.Fatalf("expected payload [%d], got %v", ProtocolVersion, msg.Payload)
+	}
+
+	// Roundtrip
+	encoded := EncodeMessage(msg)
+	decoded, err := DecodeMessage(encoded)
+	if err != nil {
+		t.Fatalf("roundtrip failed: %v", err)
+	}
+	if decoded.Type != MsgTypeVersion || decoded.Payload[0] != ProtocolVersion {
+		t.Fatalf("roundtrip mismatch: %+v", decoded)
+	}
+}
+
 func TestEncodeMessageHeaderFormat(t *testing.T) {
 	payload := []byte("test")
 	msg := Message{Type: MsgTypeChunk, Payload: payload}
