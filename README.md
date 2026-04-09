@@ -4,30 +4,47 @@ Encrypted file transfer. No accounts. No apps.
 
 ```
 $ airpipe send config.yaml
+
+  ╔══════════════════════════════════════════╗
+  ║  RIVER FALCON MARBLE 42                 ║
+  ╚══════════════════════════════════════════╝
+
+  Tell them: airpipe.sanyamgarg.com
+  They type the code, they get the file.
 ```
 
-![demo](demo.gif)
-
-Scan the QR, file downloads. Done.
-
-**Try it now:** [airpipe.sanyamgarg.com/send](https://airpipe.sanyamgarg.com/send) - send files from your browser, no install needed.
+**Try it now:** [airpipe.sanyamgarg.com/send](https://airpipe.sanyamgarg.com/send)
 
 ## Install
 
 ```bash
-curl -sL https://raw.githubusercontent.com/Sanyam-G/Airpipe/main/install.sh | sh
+curl -sSL https://airpipe.sanyamgarg.com/install.sh | sh
 ```
 
-Or from source:
+Or:
 ```bash
 go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest
+```
+
+Update an existing installation:
+```bash
+airpipe update
 ```
 
 ## Usage
 
 **Send a file:**
 ```bash
-airpipe send ./error.log
+airpipe send photo.jpg
+```
+Shows a passphrase and a QR code. The receiver either:
+- Types the passphrase at [airpipe.sanyamgarg.com](https://airpipe.sanyamgarg.com)
+- Scans the QR code
+- Runs `airpipe download` from their terminal
+
+**Download with a passphrase:**
+```bash
+airpipe download RIVER FALCON MARBLE 42
 ```
 
 **Send multiple files (auto-zipped):**
@@ -40,21 +57,22 @@ airpipe send file1.txt file2.txt photos/
 airpipe receive ./downloads
 ```
 
-**Send from browser (no CLI needed):**
+**Send from browser:**
 
-Go to [airpipe.sanyamgarg.com/send](https://airpipe.sanyamgarg.com/send), drop a file, share the link.
+Go to [airpipe.sanyamgarg.com/send](https://airpipe.sanyamgarg.com/send), drop a file, share the passphrase.
 
 ## How it works
 
 Everything is end-to-end encrypted. The relay is zero-knowledge.
 
-**Send:** CLI encrypts locally (NaCl secretbox), uploads ciphertext to relay, prints a QR code. The encryption key lives in the URL fragment (`#...`) and never reaches the server. Browser decrypts on download.
+1. CLI generates a passphrase (e.g. `RIVER FALCON MARBLE 42`)
+2. Token and encryption key are both derived from the passphrase using SHA-256 with domain separation
+3. File is encrypted locally with NaCl secretbox, uploaded to the relay as ciphertext
+4. Receiver enters the passphrase. Browser (or CLI) derives the same token and key, fetches ciphertext, decrypts locally
 
-**Receive:** CLI opens a WebSocket room and prints a QR. Phone scans, selects a file, encrypts in browser, streams chunks through relay. CLI decrypts locally.
+The relay only sees a hex token and encrypted bytes. It never sees the passphrase or the key.
 
-**Web send:** Browser generates a key, encrypts the file client-side, uploads ciphertext. Same zero-knowledge guarantee as the CLI.
-
-Files expire after 10 minutes.
+Files expire after 10 minutes. QR code and direct URL still work as fallback for nearby devices.
 
 ## Self-host
 
@@ -63,7 +81,7 @@ docker run -p 8080:8080 ghcr.io/sanyam-g/airpipe-relay
 airpipe --relay https://your-server:8080 send file.txt
 ```
 
-The relay serves the landing page, web send, and download pages. One container, everything included.
+One container. Includes the landing page, web send, download pages, and install script.
 
 ## License
 
