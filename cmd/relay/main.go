@@ -5,11 +5,13 @@ import (
 	"embed"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"io"
 	"io/fs"
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"sync"
 	"time"
 
@@ -28,6 +30,11 @@ var upgrader = websocket.Upgrader{
 const (
 	maxUploadSize = 500 << 20 // 500MB
 	fileExpiry    = 10 * time.Minute
+)
+
+var (
+	errTokenExists = errors.New("token already exists")
+	validToken     = regexp.MustCompile(`^[0-9a-f]{16}$`)
 )
 
 type StoredFile struct {
@@ -53,8 +60,19 @@ func NewFileStore() *FileStore {
 	return fs
 }
 
-func (fs *FileStore) Store(filename string, r io.Reader) (string, error) {
-	token := genToken()
+func (fs *FileStore) Store(filename string, r io.Reader, clientToken string) (string, error) {
+	token := clientToken
+	if token == "" {
+		token = genToken()
+	}
+
+	// Check for token collision
+	fs.mu.RLock()
+	_, exists := fs.files[token]
+	fs.mu.RUnlock()
+	if exists {
+		return "", errTokenExists
+	}
 
 	tmp, err := os.CreateTemp(fs.dir, "upload-*")
 	if err != nil {
@@ -254,8 +272,19 @@ func handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	token, err := fileStore.Store(header.Filename, file)
+	// Accept optional client-provided token (for passphrase-derived uploads)
+	clientToken := r.FormValue("token")
+	if clientToken != "" && !validToken.MatchString(clientToken) {
+		http.Error(w, "invalid token format", http.StatusBadRequest)
+		return
+	}
+
+	token, err := fileStore.Store(header.Filename, file, clientToken)
 	if err != nil {
+		if errors.Is(err, errTokenExists) {
+			http.Error(w, "token conflict", http.StatusConflict)
+			return
+		}
 		http.Error(w, "storage failed", http.StatusInternalServerError)
 		return
 	}
@@ -361,6 +390,8 @@ func main() {
 		port = "8080"
 	}
 	mux := http.NewServeMux()
+	staticFS, _ := fs.Sub(staticFiles, "static")
+	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
 	mux.HandleFunc("GET /", handleLandingPage)
 	mux.HandleFunc("GET /send", handleSendPage)
 	mux.HandleFunc("POST /upload", handleUploadFile)
