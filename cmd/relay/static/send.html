@@ -73,6 +73,16 @@ input[type=file]{display:none}
 }
 .copy-badge.show{opacity:1}
 .expiry{font-size:0.6rem;color:#444;text-transform:uppercase;letter-spacing:1px;margin-top:8px}
+.phrase-display{
+  font-size:1.3rem;font-weight:700;color:#00d4ff;
+  letter-spacing:4px;text-transform:uppercase;
+  padding:16px;border:1px dotted #00d4ff;
+  margin:8px 0;cursor:pointer;
+  transition:background 0.15s;
+}
+.phrase-display:hover{background:rgba(0,212,255,0.05)}
+.phrase-hint{font-size:0.65rem;color:#555;margin:4px 0}
+.phrase-hint strong{color:#888}
 
 .hidden{display:none}
 
@@ -130,6 +140,9 @@ input[type=file]{display:none}
 
     <div id="done" class="hidden">
       <div class="status" style="color:#00d4ff">ready to share</div>
+      <div class="phrase-display" id="phrase-display"></div>
+      <div class="phrase-hint">tell them: <strong id="phrase-domain"></strong></div>
+      <div class="phrase-hint" style="margin-bottom:12px">they type the code, they get the file.</div>
       <div class="qr-wrap" id="qr"></div>
       <div class="url-box" id="url-box" onclick="copyURL()">
         <span id="share-url">-</span>
@@ -156,6 +169,7 @@ input[type=file]{display:none}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl-fast.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+<script src="/static/words.js"></script>
 <script>
 const dropzone=document.getElementById('dropzone');
 const fileinput=document.getElementById('fileinput');
@@ -191,6 +205,8 @@ function formatSize(bytes){
 }
 
 let shareURL='';
+let currentPhrase='';
+
 function copyURL(){
   navigator.clipboard.writeText(shareURL);
   const badge=document.getElementById('copy-badge');
@@ -198,8 +214,38 @@ function copyURL(){
   setTimeout(()=>badge.classList.remove('show'),1500);
 }
 
+function copyPhrase(){
+  navigator.clipboard.writeText(currentPhrase);
+}
+
+function generatePassphrase(){
+  const words=[];
+  const arr=new Uint32Array(5);
+  crypto.getRandomValues(arr);
+  for(let i=0;i<4;i++)words.push(AIRPIPE_WORDS[arr[i]%1024]);
+  const num=10+(arr[4]%90);
+  return words.join(' ')+' '+num;
+}
+
+async function sha256(str){
+  const data=new TextEncoder().encode(str);
+  const hash=await crypto.subtle.digest('SHA-256',data);
+  return new Uint8Array(hash);
+}
+
+function hexEncode(bytes){
+  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
 async function handleFile(file){
   try{
+    // Generate passphrase and derive token + key
+    currentPhrase=generatePassphrase();
+    const normalized=currentPhrase.toUpperCase().trim().replace(/\s+/g,' ');
+    const tokenHash=await sha256('airpipe:token:'+normalized);
+    const derivedToken=hexEncode(tokenHash.slice(0,8));
+    const keyBytes=await sha256('airpipe:key:'+normalized);
+
     // Encrypt
     show('encrypting');
     document.getElementById('enc-name').textContent=file.name;
@@ -226,10 +272,9 @@ async function handleFile(file){
     document.getElementById('enc-progress').style.width='60%';
     document.getElementById('enc-text').textContent='encrypting with NaCl...';
 
-    // Generate key and encrypt
-    const key=nacl.randomBytes(32);
+    // Encrypt with passphrase-derived key
     const nonce=nacl.randomBytes(24);
-    const ciphertext=nacl.secretbox(payload,nonce,key);
+    const ciphertext=nacl.secretbox(payload,nonce,keyBytes);
 
     // Prepend nonce
     const encrypted=new Uint8Array(24+ciphertext.length);
@@ -239,11 +284,12 @@ async function handleFile(file){
     document.getElementById('enc-progress').style.width='100%';
     document.getElementById('enc-text').textContent='encrypted '+formatSize(encrypted.length);
 
-    // Upload
+    // Upload with derived token
     show('uploading');
     document.getElementById('up-name').textContent=file.name+' (encrypted)';
 
     const formData=new FormData();
+    formData.append('token',derivedToken);
     formData.append('file',new Blob([encrypted]),'encrypted.bin');
 
     const xhr=new XMLHttpRequest();
@@ -262,9 +308,14 @@ async function handleFile(file){
       let resp;
       try{resp=JSON.parse(xhr.responseText)}catch(e){showError('Invalid server response');return}
 
-      const keyB64=b64encode(key);
+      const keyB64=b64encode(keyBytes);
       shareURL=location.origin+'/d/'+resp.token+'#'+keyB64;
 
+      // Show passphrase prominently
+      const phraseEl=document.getElementById('phrase-display');
+      phraseEl.textContent=currentPhrase;
+      phraseEl.onclick=copyPhrase;
+      document.getElementById('phrase-domain').textContent=location.host;
       document.getElementById('share-url').textContent=shareURL;
 
       // Generate QR

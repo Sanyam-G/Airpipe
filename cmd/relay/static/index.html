@@ -77,6 +77,24 @@ a:hover{text-decoration:underline}
 .footer a{color:#444}
 .footer a:hover{color:#00d4ff}
 
+.passphrase-section{width:100%;display:flex;flex-direction:column;gap:8px;align-items:center}
+.section-label{font-size:0.6rem;color:#555;text-transform:uppercase;letter-spacing:2px}
+.passphrase-row{width:100%;display:flex;gap:8px}
+.phrase-input{
+  flex:1;
+  background:#0a0a0a;border:1px dotted #333;
+  padding:14px 16px;
+  font-family:'JetBrains Mono',monospace;
+  font-size:0.85rem;color:#fff;
+  text-transform:uppercase;letter-spacing:2px;
+  outline:none;transition:border-color 0.15s;
+}
+.phrase-input:focus{border-color:#00d4ff}
+.phrase-input::placeholder{color:#333;text-transform:uppercase}
+.phrase-btn{padding:14px 20px;white-space:nowrap;cursor:pointer;background:transparent}
+.phrase-error{font-size:0.65rem;color:#ff4444;min-height:1em}
+.divider{font-size:0.6rem;color:#333;text-transform:uppercase;letter-spacing:2px}
+
 @media(max-width:540px){
   .hero h1{font-size:2rem;letter-spacing:4px}
   .features{grid-template-columns:1fr}
@@ -107,6 +125,17 @@ a:hover{text-decoration:underline}
     </div>
   </div>
 
+  <div class="passphrase-section">
+    <div class="section-label">have a code?</div>
+    <div class="passphrase-row">
+      <input type="text" id="phrase-input" class="phrase-input" placeholder="e.g. RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false">
+      <button id="phrase-btn" class="cta phrase-btn" onclick="submitPhrase()">[ download ]</button>
+    </div>
+    <div id="phrase-error" class="phrase-error"></div>
+  </div>
+
+  <div class="divider">or</div>
+
   <a href="/send" class="cta">[ send a file ]</a>
 
   <div class="install">
@@ -135,6 +164,50 @@ function copyCode(el){
   badge.classList.add('show');
   setTimeout(()=>badge.classList.remove('show'),1500);
 }
+
+function normalize(phrase){
+  return phrase.toUpperCase().trim().replace(/\s+/g,' ');
+}
+
+async function sha256(str){
+  const data=new TextEncoder().encode(str);
+  const hash=await crypto.subtle.digest('SHA-256',data);
+  return new Uint8Array(hash);
+}
+
+function hexEncode(bytes){
+  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+function b64urlEncode(bytes){
+  let binary='';
+  for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
+  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+
+async function submitPhrase(){
+  const input=document.getElementById('phrase-input').value;
+  const errEl=document.getElementById('phrase-error');
+  errEl.textContent='';
+
+  const phrase=normalize(input);
+  if(!phrase||phrase.length<5){
+    errEl.textContent='enter the passphrase from the sender';
+    return;
+  }
+
+  const tokenHash=await sha256('airpipe:token:'+phrase);
+  const token=hexEncode(tokenHash.slice(0,8));
+
+  const keyHash=await sha256('airpipe:key:'+phrase);
+  const keyB64=b64urlEncode(keyHash);
+
+  window.location.href='/d/'+token+'#'+keyB64;
+}
+
+document.getElementById('phrase-input').addEventListener('keydown',(e)=>{
+  if(e.key==='Enter')submitPhrase();
+});
 </script>
 </body>
 </html>

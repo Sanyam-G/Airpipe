@@ -153,7 +153,7 @@ func TestFileStoreRoundtrip(t *testing.T) {
 	fs := NewFileStore()
 	content := []byte("hello airpipe")
 
-	token, err := fs.Store("test.txt", bytes.NewReader(content))
+	token, err := fs.Store("test.txt", bytes.NewReader(content), "")
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}

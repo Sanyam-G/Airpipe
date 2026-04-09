@@ -17,6 +17,7 @@ import (
 
 	"github.com/sanyamgarg/airpipe/internal/archive"
 	"github.com/sanyamgarg/airpipe/internal/crypto"
+	"github.com/sanyamgarg/airpipe/internal/passphrase"
 	"github.com/sanyamgarg/airpipe/internal/qr"
 	"github.com/sanyamgarg/airpipe/internal/transfer"
 )
@@ -116,6 +117,11 @@ func cmdSend(relay string, files []string) error {
 		fmt.Printf("  %s%s%s  %s%s%s\n", colorBold, filename, colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
 	}
 
+	// Generate passphrase and derive token + key
+	phrase := passphrase.Generate()
+	derivedToken := passphrase.DeriveToken(phrase)
+	derivedKey := passphrase.DeriveKey(phrase)
+
 	// Encrypt the file: [4-byte filename len][filename][content]
 	fmt.Print("  Encrypting...")
 	plaintext, err := os.ReadFile(uploadPath)
@@ -123,14 +129,13 @@ func cmdSend(relay string, files []string) error {
 		return fmt.Errorf("read failed: %w", err)
 	}
 
-	key, _ := crypto.GenerateKey()
 	fnBytes := []byte(filename)
 	payload := &bytes.Buffer{}
 	binary.Write(payload, binary.BigEndian, uint32(len(fnBytes)))
 	payload.Write(fnBytes)
 	payload.Write(plaintext)
 
-	ciphertext, err := crypto.Encrypt(payload.Bytes(), key)
+	ciphertext, err := crypto.Encrypt(payload.Bytes(), derivedKey[:])
 	if err != nil {
 		return fmt.Errorf("encryption failed: %w", err)
 	}
@@ -139,14 +144,22 @@ func cmdSend(relay string, files []string) error {
 	fmt.Print("  Uploading...\n\n")
 
 	httpRelay := toHTTP(relay)
-	token, err := uploadEncrypted(httpRelay, ciphertext)
+	token, err := uploadEncrypted(httpRelay, ciphertext, derivedToken)
 	if err != nil {
 		return err
 	}
 
-	url := fmt.Sprintf("%s/d/%s#%s", httpRelay, token, crypto.KeyToBase64(key))
+	// Display passphrase prominently
+	fmt.Printf("  %s%s╔══════════════════════════════════════════╗%s\n", colorBold, colorCyan, colorReset)
+	fmt.Printf("  %s%s║  %-40s║%s\n", colorBold, colorCyan, phrase, colorReset)
+	fmt.Printf("  %s%s╚══════════════════════════════════════════╝%s\n\n", colorBold, colorCyan, colorReset)
+	fmt.Printf("  Tell them: %s%s%s\n", colorBold, httpRelay, colorReset)
+	fmt.Printf("  They type the code, they get the file.\n\n")
+
+	// Also show QR + URL as fallback for nearby devices
+	url := fmt.Sprintf("%s/d/%s#%s", httpRelay, token, crypto.KeyToBase64(derivedKey[:]))
 	qr.GenerateTerminal(url)
-	fmt.Printf("\n  %s%s%s\n\n", colorCyan, url, colorReset)
+	fmt.Printf("\n  %s%s%s%s\n\n", colorDim, "Direct link: ", colorReset, url)
 	fmt.Printf("  %sE2E encrypted. Expires in 10 minutes.%s\n\n", colorDim, colorReset)
 
 	return nil
@@ -179,13 +192,22 @@ func cmdReceive(relay, destDir string) error {
 	return nil
 }
 
-func uploadEncrypted(baseURL string, ciphertext []byte) (string, error) {
+func uploadEncrypted(baseURL string, ciphertext []byte, clientToken string) (string, error) {
 	pr, pw := io.Pipe()
 	mw := multipart.NewWriter(pw)
 
 	total := int64(len(ciphertext))
 	errCh := make(chan error, 1)
 	go func() {
+		// Send the client-derived token
+		if clientToken != "" {
+			if err := mw.WriteField("token", clientToken); err != nil {
+				pw.CloseWithError(err)
+				errCh <- err
+				return
+			}
+		}
+
 		part, err := mw.CreateFormFile("file", "encrypted.bin")
 		if err != nil {
 			pw.CloseWithError(err)
