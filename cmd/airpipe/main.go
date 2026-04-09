@@ -48,8 +48,9 @@ func main() {
 	args := flag.Args()
 
 	if len(args) < 1 {
-		fmt.Printf("Usage: %sairpipe%s send <file> [file2...] | %sairpipe%s receive [dir]\n",
-			colorBold, colorReset, colorBold, colorReset)
+		fmt.Printf("Usage: %sairpipe%s send <file> [file2...]\n", colorBold, colorReset)
+		fmt.Printf("       %sairpipe%s receive [dir]\n", colorBold, colorReset)
+		fmt.Printf("       %sairpipe%s download <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
 		os.Exit(1)
 	}
 
@@ -67,6 +68,12 @@ func main() {
 			dir = args[1]
 		}
 		err = cmdReceive(*relay, dir)
+	case "download":
+		if len(args) < 2 {
+			fmt.Println("Usage: airpipe download <WORD WORD WORD NN> [dir]")
+			os.Exit(1)
+		}
+		err = cmdDownload(*relay, args[1:])
 	default:
 		fmt.Printf("Unknown command: %s\n", args[0])
 		os.Exit(1)
@@ -189,6 +196,90 @@ func cmdReceive(relay, destDir string) error {
 		return err
 	}
 	fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
+	return nil
+}
+
+func cmdDownload(relay string, args []string) error {
+	// Parse passphrase: last arg might be a directory, or part of the passphrase
+	// Passphrase is typically 5 tokens: WORD WORD WORD WORD NN
+	// Try to detect if last arg is a directory
+	destDir := "."
+	phraseArgs := args
+
+	if len(args) > 1 {
+		last := args[len(args)-1]
+		if info, err := os.Stat(last); err == nil && info.IsDir() {
+			destDir = last
+			phraseArgs = args[:len(args)-1]
+		}
+	}
+
+	phrase := strings.Join(phraseArgs, " ")
+	derivedToken := passphrase.DeriveToken(phrase)
+	derivedKey := passphrase.DeriveKey(phrase)
+
+	banner("download")
+	fmt.Printf("  Passphrase: %s%s%s\n", colorCyan, passphrase.Normalize(phrase), colorReset)
+	fmt.Printf("  Destination: %s%s%s\n\n", colorBold, destDir, colorReset)
+	fmt.Print("  Fetching...")
+
+	httpRelay := toHTTP(relay)
+	resp, err := http.Get(httpRelay + "/raw/" + derivedToken)
+	if err != nil {
+		return fmt.Errorf("fetch failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("file not found or expired. Check the passphrase and try again")
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("server error: %d", resp.StatusCode)
+	}
+
+	ciphertext, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("download failed: %w", err)
+	}
+	fmt.Printf("\r  Fetched %s✓%s  %s(%s)%s\n", colorGreen, colorReset, colorDim, fmtBytes(int64(len(ciphertext))), colorReset)
+
+	// Decrypt
+	fmt.Print("  Decrypting...")
+	plaintext, err := crypto.Decrypt(ciphertext, derivedKey[:])
+	if err != nil {
+		return fmt.Errorf("decryption failed (wrong passphrase?): %w", err)
+	}
+	fmt.Printf("\r  Decrypted %s✓%s\n", colorGreen, colorReset)
+
+	// Parse payload: [4-byte filename len][filename][content]
+	if len(plaintext) < 4 {
+		return fmt.Errorf("invalid payload")
+	}
+	fnLen := int(binary.BigEndian.Uint32(plaintext[:4]))
+	if len(plaintext) < 4+fnLen {
+		return fmt.Errorf("invalid payload")
+	}
+	filename := string(plaintext[4 : 4+fnLen])
+	content := plaintext[4+fnLen:]
+
+	// Save file, avoid overwriting
+	savePath := filepath.Join(destDir, filename)
+	if _, err := os.Stat(savePath); err == nil {
+		base := strings.TrimSuffix(filename, filepath.Ext(filename))
+		ext := filepath.Ext(filename)
+		for i := 1; ; i++ {
+			savePath = filepath.Join(destDir, fmt.Sprintf("%s_%d%s", base, i, ext))
+			if _, err := os.Stat(savePath); os.IsNotExist(err) {
+				break
+			}
+		}
+	}
+
+	if err := os.WriteFile(savePath, content, 0644); err != nil {
+		return fmt.Errorf("save failed: %w", err)
+	}
+
+	fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savePath, colorReset)
 	return nil
 }
 
