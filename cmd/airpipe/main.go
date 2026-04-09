@@ -325,7 +325,21 @@ func cmdUpdate() error {
 	// Write to temp file next to the binary, then atomic rename
 	tmpPath := execPath + ".tmp"
 	if err := os.WriteFile(tmpPath, binary, 0755); err != nil {
-		return fmt.Errorf("write failed (try with sudo?): %w", err)
+		// Can't write next to current binary, fall back to ~/.local/bin
+		home, homeErr := os.UserHomeDir()
+		if homeErr != nil {
+			return fmt.Errorf("write failed (try with sudo?): %w", err)
+		}
+		localBin := filepath.Join(home, ".local", "bin")
+		os.MkdirAll(localBin, 0755)
+		fallbackPath := filepath.Join(localBin, "airpipe")
+		if err := os.WriteFile(fallbackPath, binary, 0755); err != nil {
+			return fmt.Errorf("write failed (try with sudo?): %w", err)
+		}
+		fmt.Printf("  %s✓ Installed to %s%s (%s)\n", colorGreen, fallbackPath, colorReset, fmtBytes(int64(len(binary))))
+		fmt.Printf("  %sCouldn't update %s (permission denied). Using %s instead.%s\n", colorDim, execPath, localBin, colorReset)
+		fmt.Printf("  %sMake sure %s is in your PATH.%s\n\n", colorDim, localBin, colorReset)
+		return nil
 	}
 
 	if err := os.Rename(tmpPath, execPath); err != nil {
