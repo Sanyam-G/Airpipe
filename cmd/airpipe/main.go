@@ -323,35 +323,37 @@ func cmdUpdate() error {
 		return fmt.Errorf("could not resolve path: %w", err)
 	}
 
-	// Write to temp file in /tmp (always writable), then move to target
+	// Write new binary to /tmp
 	tmpPath := filepath.Join(os.TempDir(), "airpipe-update")
 	if err := os.WriteFile(tmpPath, binary, 0755); err != nil {
 		return fmt.Errorf("write to temp failed: %w", err)
 	}
 
-	// Try direct rename first (works if same filesystem and we have permission)
-	if err := os.Rename(tmpPath, execPath); err != nil {
-		// Try copy instead (cross-filesystem)
-		if err := copyFile(tmpPath, execPath); err != nil {
-			// No permission, re-exec with sudo
-			os.Remove(tmpPath)
-			fmt.Printf("  Need sudo to update %s\n", execPath)
-			cmd := exec.Command("sudo", "cp", tmpPath, execPath)
-			// Re-write tmp since we removed it
-			os.WriteFile(tmpPath, binary, 0755)
-			cmd.Stdin = os.Stdin
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			if err := cmd.Run(); err != nil {
+	// Replace the running binary: remove old, then move new in.
+	// Can't overwrite a running binary on Linux, but removing + renaming works.
+	// Try without sudo first, then escalate.
+	if err := os.Remove(execPath); err == nil {
+		if err := os.Rename(tmpPath, execPath); err != nil {
+			// Cross-filesystem, use copy
+			if err := copyFile(tmpPath, execPath); err != nil {
 				os.Remove(tmpPath)
-				return fmt.Errorf("sudo update failed: %w", err)
+				return fmt.Errorf("move failed: %w", err)
 			}
+		}
+		os.Remove(tmpPath)
+	} else {
+		// Need sudo: remove old binary, move new one in
+		fmt.Printf("  Need sudo to update %s\n", execPath)
+		cmd := exec.Command("sudo", "sh", "-c",
+			fmt.Sprintf("rm -f %s && mv %s %s", execPath, tmpPath, execPath))
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
 			os.Remove(tmpPath)
-			fmt.Printf("  %s✓ Updated %s%s (%s)\n\n", colorGreen, execPath, colorReset, fmtBytes(int64(len(binary))))
-			return nil
+			return fmt.Errorf("sudo update failed: %w", err)
 		}
 	}
-	os.Remove(tmpPath)
 
 	fmt.Printf("  %s✓ Updated %s%s (%s)\n\n", colorGreen, execPath, colorReset, fmtBytes(int64(len(binary))))
 	return nil
