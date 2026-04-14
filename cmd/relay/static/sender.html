@@ -204,6 +204,9 @@ async function sendFile(file){
   document.getElementById('send-size').textContent=formatSize(file.size);
   show('sending');
 
+  // Send protocol version handshake (0x20 = MsgTypeVersion, payload = [1])
+  ws.send(encrypt(encode(0x20,new Uint8Array([1])),keyBytes));
+
   const meta={filename:file.name,size:file.size,chunks:Math.ceil(file.size/CHUNK)};
   ws.send(encrypt(encode(0x01,new TextEncoder().encode(JSON.stringify(meta))),keyBytes));
 
