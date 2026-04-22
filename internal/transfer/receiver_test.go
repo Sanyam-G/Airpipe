@@ -72,3 +72,43 @@ func TestReceiveFileNotADir(t *testing.T) {
 		t.Fatal("expected error when dest is a file, not a directory")
 	}
 }
+
+func TestSafeFilename(t *testing.T) {
+	cases := []struct {
+		name    string
+		in      string
+		want    string
+		wantErr bool
+	}{
+		{"plain", "report.pdf", "report.pdf", false},
+		{"with spaces", "my file.txt", "my file.txt", false},
+		{"unicode", "café.md", "café.md", false},
+		{"relative traversal", "../etc/passwd", "", true},
+		{"deeper traversal", "../../../../etc/shadow", "", true},
+		{"absolute", "/etc/passwd", "", true},
+		{"windows absolute", "C:\\Windows\\System32", "", true},
+		{"null byte", "good\x00.txt", "", true},
+		{"dot", ".", "", true},
+		{"double dot", "..", "", true},
+		{"empty", "", "", true},
+		{"slash only", "/", "", true},
+		{"nested", "sub/dir/file.txt", "", true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, err := SafeFilename(c.in)
+			if c.wantErr {
+				if err == nil {
+					t.Fatalf("expected error for %q, got %q", c.in, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error for %q: %v", c.in, err)
+			}
+			if got != c.want {
+				t.Fatalf("got %q, want %q", got, c.want)
+			}
+		})
+	}
+}

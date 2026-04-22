@@ -2,13 +2,40 @@ package transfer
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gorilla/websocket"
 	"github.com/sanyamgarg/airpipe/internal/crypto"
+	"github.com/sanyamgarg/airpipe/internal/p2p"
 )
+
+// SafeFilename validates a sender-provided filename. It rejects anything with
+// path components, traversal sequences, or control characters rather than
+// silently sanitizing — loud rejection surfaces malicious senders instead of
+// hiding them.
+func SafeFilename(raw string) (string, error) {
+	if raw == "" {
+		return "", fmt.Errorf("empty filename")
+	}
+	if strings.ContainsRune(raw, 0) {
+		return "", fmt.Errorf("filename contains null byte")
+	}
+	if strings.ContainsAny(raw, `/\`) {
+		return "", fmt.Errorf("filename contains path separator: %q", raw)
+	}
+	if raw == "." || raw == ".." {
+		return "", fmt.Errorf("invalid filename: %q", raw)
+	}
+	// Catch sneaky inputs like ". " or " .." that filepath.Clean rewrites.
+	if filepath.Clean(raw) != raw {
+		return "", fmt.Errorf("invalid filename: %q", raw)
+	}
+	return raw, nil
+}
 
 type Receiver struct {
 	relayURL string
@@ -29,7 +56,6 @@ func (r *Receiver) Connect() error {
 	}
 	r.conn = conn
 
-	// Read and validate protocol version before proceeding
 	r.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	_, versionData, err := r.conn.ReadMessage()
 	if err != nil {
@@ -48,7 +74,7 @@ func (r *Receiver) Connect() error {
 		if len(versionMsg.Payload) > 0 {
 			got = versionMsg.Payload[0]
 		}
-		return fmt.Errorf("protocol version mismatch: got %d, expected %d", got, ProtocolVersion)
+		return fmt.Errorf("protocol version mismatch: got %d, expected %d (run `airpipe update`)", got, ProtocolVersion)
 	}
 	r.conn.SetReadDeadline(time.Time{})
 
@@ -57,11 +83,9 @@ func (r *Receiver) Connect() error {
 	if err != nil {
 		return fmt.Errorf("failed to encrypt ready message: %w", err)
 	}
-
 	if err := r.conn.WriteMessage(websocket.BinaryMessage, encryptedReady); err != nil {
 		return fmt.Errorf("failed to send ready message: %w", err)
 	}
-
 	return nil
 }
 
@@ -79,8 +103,10 @@ func uniquePath(path string) string {
 	}
 }
 
+// ReceiveFile consumes a transfer over the relay WS. The path-traversal fix
+// lives inside recvFile via SafeFilename. v2 WebRTC support lives in
+// signaling.go + p2p/peer.go behind a future opt-in.
 func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total int64)) (string, error) {
-	// Validate destination directory exists and is a directory
 	info, err := os.Stat(destDir)
 	if err != nil {
 		return "", fmt.Errorf("destination directory %q does not exist: %w", destDir, err)
@@ -88,7 +114,45 @@ func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total i
 	if !info.IsDir() {
 		return "", fmt.Errorf("destination path %q is not a directory", destDir)
 	}
+	return r.recvFile(r.wsReader(), destDir, progressFn, nil)
+}
 
+type msgReader func() (Message, error)
+
+func (r *Receiver) wsReader() msgReader {
+	return func() (Message, error) {
+		r.conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
+		_, encrypted, err := r.conn.ReadMessage()
+		if err != nil {
+			return Message{}, err
+		}
+		plaintext, err := crypto.DecryptChunk(encrypted, r.key)
+		if err != nil {
+			return Message{}, err
+		}
+		return DecodeMessage(plaintext)
+	}
+}
+
+func (r *Receiver) peerReader(peer *p2p.Peer) msgReader {
+	return func() (Message, error) {
+		select {
+		case data, ok := <-peer.Messages():
+			if !ok {
+				return Message{}, io.EOF
+			}
+			plaintext, err := crypto.DecryptChunk(data, r.key)
+			if err != nil {
+				return Message{}, err
+			}
+			return DecodeMessage(plaintext)
+		case <-time.After(5 * time.Minute):
+			return Message{}, fmt.Errorf("p2p read timeout")
+		}
+	}
+}
+
+func (r *Receiver) recvFile(read msgReader, destDir string, progressFn func(received, total int64), primed *Message) (string, error) {
 	var metadata Metadata
 	var file *os.File
 	var bytesReceived int64
@@ -100,54 +164,63 @@ func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total i
 		}
 	}()
 
-	for {
-		r.conn.SetReadDeadline(time.Now().Add(5 * time.Minute))
-
-		_, encryptedData, err := r.conn.ReadMessage()
-		if err != nil {
-			return "", fmt.Errorf("failed to read message: %w", err)
-		}
-
-		decrypted, err := crypto.DecryptChunk(encryptedData, r.key)
-		if err != nil {
-			return "", fmt.Errorf("failed to decrypt message: %w", err)
-		}
-
-		msg, err := DecodeMessage(decrypted)
-		if err != nil {
-			return "", fmt.Errorf("failed to decode message: %w", err)
-		}
-
+	handle := func(msg Message) (string, bool, error) {
 		switch msg.Type {
 		case MsgTypeMetadata:
-			metadata, err = ParseMetadata(msg.Payload)
+			meta, err := ParseMetadata(msg.Payload)
 			if err != nil {
-				return "", fmt.Errorf("failed to parse metadata: %w", err)
+				return "", false, fmt.Errorf("parse metadata: %w", err)
 			}
-			destPath = uniquePath(filepath.Join(destDir, metadata.Filename))
-			file, err = os.Create(destPath)
+			safeName, err := SafeFilename(meta.Filename)
 			if err != nil {
-				return "", fmt.Errorf("failed to create file: %w", err)
+				return "", false, fmt.Errorf("unsafe filename from sender: %w", err)
 			}
-
+			metadata = meta
+			destPath = uniquePath(filepath.Join(destDir, safeName))
+			f, err := os.Create(destPath)
+			if err != nil {
+				return "", false, fmt.Errorf("create file: %w", err)
+			}
+			file = f
 		case MsgTypeChunk:
 			if file == nil {
-				return "", fmt.Errorf("received chunk before metadata")
+				return "", false, fmt.Errorf("received chunk before metadata")
 			}
 			n, err := file.Write(msg.Payload)
 			if err != nil {
-				return "", fmt.Errorf("failed to write chunk: %w", err)
+				return "", false, fmt.Errorf("write chunk: %w", err)
 			}
 			bytesReceived += int64(n)
 			if progressFn != nil {
 				progressFn(bytesReceived, metadata.Size)
 			}
-
 		case MsgTypeComplete:
-			return destPath, nil
-
+			return destPath, true, nil
 		case MsgTypeError:
-			return "", fmt.Errorf("sender error: %s", string(msg.Payload))
+			return "", false, fmt.Errorf("sender error: %s", string(msg.Payload))
+		}
+		return "", false, nil
+	}
+
+	if primed != nil {
+		if path, done, err := handle(*primed); err != nil {
+			return "", err
+		} else if done {
+			return path, nil
+		}
+	}
+
+	for {
+		msg, err := read()
+		if err != nil {
+			return "", fmt.Errorf("read message: %w", err)
+		}
+		path, done, err := handle(msg)
+		if err != nil {
+			return "", err
+		}
+		if done {
+			return path, nil
 		}
 	}
 }
