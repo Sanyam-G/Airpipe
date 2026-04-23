@@ -77,6 +77,7 @@ func (s *Sender) SendFile(filePath string, progressFn func(sent, total int64)) e
 
 	peer, err := negotiateSender(ctx, s.conn, s.key)
 	if err == nil {
+		fmt.Fprintln(os.Stderr, "[airpipe] transport: P2P (WebRTC DataChannel)")
 		if sigErr := writeSignalMsg(s.conn, s.key, NewP2PReadyMessage()); sigErr != nil {
 			peer.Close()
 			return fmt.Errorf("signal p2p ready: %w", sigErr)
@@ -89,6 +90,7 @@ func (s *Sender) SendFile(filePath string, progressFn func(sent, total int64)) e
 		return streamErr
 	}
 
+	fmt.Fprintf(os.Stderr, "[airpipe] transport: WS relay fallback (P2P negotiation failed: %v)\n", err)
 	_ = writeSignalMsg(s.conn, s.key, NewP2PFailMessage(err.Error()))
 	wsSend := func(data []byte) error {
 		return s.conn.WriteMessage(websocket.BinaryMessage, data)

@@ -3,9 +3,7 @@ package transfer
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -40,18 +38,37 @@ func readSignalMsg(conn *websocket.Conn, key []byte) (Message, error) {
 	return DecodeMessage(decrypted)
 }
 
-func isTimeout(err error) bool {
-	var ne net.Error
-	if errors.As(err, &ne) && ne.Timeout() {
-		return true
-	}
-	return false
+// readerLoop runs in a goroutine doing blocking reads from the WS conn until
+// the conn closes or the loop is told to stop via stopCh. Each message goes
+// onto out. Errors close errCh. gorilla/websocket panics if you try to read
+// after a previous read error, so we keep all reads in this single loop and
+// signal exit via close(out) / errCh.
+type wsRead struct {
+	msg Message
+	err error
 }
 
-// negotiateSender drives the WebRTC SDP/ICE handshake from the offerer side
-// over an already-connected, version-negotiated WS conn. Returns a peer whose
-// DataChannel is open, or an error if negotiation fails / times out. The WS
-// conn is left ready for further use by the caller.
+func startWSReader(conn *websocket.Conn, key []byte, stopCh <-chan struct{}) <-chan wsRead {
+	out := make(chan wsRead, 16)
+	go func() {
+		defer close(out)
+		for {
+			msg, err := readSignalMsg(conn, key)
+			select {
+			case out <- wsRead{msg: msg, err: err}:
+			case <-stopCh:
+				return
+			}
+			if err != nil {
+				return
+			}
+		}
+	}()
+	return out
+}
+
+// negotiateSender drives the WebRTC SDP/ICE handshake from the offerer side.
+// Returns a peer whose DataChannel is open, or an error.
 func negotiateSender(ctx context.Context, conn *websocket.Conn, key []byte) (*p2p.Peer, error) {
 	negCtx, cancel := context.WithTimeout(ctx, NegotiateTimeout)
 	defer cancel()
@@ -70,6 +87,10 @@ func negotiateSender(ctx context.Context, conn *websocket.Conn, key []byte) (*p2
 		peer.Close()
 		return nil, err
 	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	reads := startWSReader(conn, key, stopCh)
 
 	// Trickle local candidates in the background.
 	trickleDone := make(chan struct{})
@@ -91,46 +112,52 @@ func negotiateSender(ctx context.Context, conn *websocket.Conn, key []byte) (*p2
 		}
 	}()
 
-	// Poll-read remote messages while also watching for DataChannel open.
+	openCh := make(chan struct{})
+	go func() {
+		_ = peer.WaitOpen(negCtx)
+		close(openCh)
+	}()
+
 	for {
-		if peer.IsOpen() {
-			_ = conn.SetReadDeadline(time.Time{})
+		select {
+		case <-openCh:
+			if !peer.IsOpen() {
+				peer.Close()
+				return nil, fmt.Errorf("datachannel did not open within %s", NegotiateTimeout)
+			}
 			cancel()
 			<-trickleDone
 			return peer, nil
-		}
-		if err := negCtx.Err(); err != nil {
-			peer.Close()
-			return nil, err
-		}
-
-		_ = conn.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
-		msg, err := readSignalMsg(conn, key)
-		if err != nil {
-			if isTimeout(err) {
-				continue
-			}
-			peer.Close()
-			return nil, err
-		}
-
-		switch msg.Type {
-		case MsgTypeSDPAnswer:
-			if err := peer.SetRemoteAnswer(negCtx, string(msg.Payload)); err != nil {
+		case r, ok := <-reads:
+			if !ok {
 				peer.Close()
-				return nil, fmt.Errorf("set remote answer: %w", err)
+				return nil, fmt.Errorf("signaling channel closed")
 			}
-		case MsgTypeICECandidate:
-			_ = peer.AddICECandidate(msg.Payload)
-		case MsgTypeP2PFail:
+			if r.err != nil {
+				peer.Close()
+				return nil, fmt.Errorf("read signal: %w", r.err)
+			}
+			switch r.msg.Type {
+			case MsgTypeSDPAnswer:
+				if err := peer.SetRemoteAnswer(negCtx, string(r.msg.Payload)); err != nil {
+					peer.Close()
+					return nil, fmt.Errorf("set remote answer: %w", err)
+				}
+			case MsgTypeICECandidate:
+				_ = peer.AddICECandidate(r.msg.Payload)
+			case MsgTypeP2PFail:
+				peer.Close()
+				return nil, fmt.Errorf("peer reported p2p failure: %s", string(r.msg.Payload))
+			}
+		case <-negCtx.Done():
 			peer.Close()
-			return nil, fmt.Errorf("peer reported p2p failure: %s", string(msg.Payload))
+			return nil, negCtx.Err()
 		}
 	}
 }
 
-// negotiateReceiver handles the answerer side. It expects the caller to have
-// already consumed the initial SDPOffer message and passes its payload in.
+// negotiateReceiver handles the answerer side. The caller has already consumed
+// the initial SDPOffer message and passes its payload in.
 func negotiateReceiver(ctx context.Context, conn *websocket.Conn, key []byte, offerSDP string) (*p2p.Peer, error) {
 	negCtx, cancel := context.WithTimeout(ctx, NegotiateTimeout)
 	defer cancel()
@@ -149,6 +176,10 @@ func negotiateReceiver(ctx context.Context, conn *websocket.Conn, key []byte, of
 		peer.Close()
 		return nil, err
 	}
+
+	stopCh := make(chan struct{})
+	defer close(stopCh)
+	reads := startWSReader(conn, key, stopCh)
 
 	trickleDone := make(chan struct{})
 	go func() {
@@ -169,34 +200,46 @@ func negotiateReceiver(ctx context.Context, conn *websocket.Conn, key []byte, of
 		}
 	}()
 
+	openCh := make(chan struct{})
+	go func() {
+		_ = peer.WaitOpen(negCtx)
+		close(openCh)
+	}()
+
+	// Receiver holds the only WS reader. Don't return until BOTH the DC is
+	// open AND the sender has sent P2PReady — otherwise the caller would
+	// race a second concurrent reader on the same conn (gorilla panics).
+	dcOpen, p2pReady := false, false
 	for {
-		if peer.IsOpen() {
-			_ = conn.SetReadDeadline(time.Time{})
+		if dcOpen && p2pReady {
 			cancel()
 			<-trickleDone
 			return peer, nil
 		}
-		if err := negCtx.Err(); err != nil {
-			peer.Close()
-			return nil, err
-		}
-
-		_ = conn.SetReadDeadline(time.Now().Add(150 * time.Millisecond))
-		msg, err := readSignalMsg(conn, key)
-		if err != nil {
-			if isTimeout(err) {
-				continue
+		select {
+		case <-openCh:
+			dcOpen = true
+		case r, ok := <-reads:
+			if !ok {
+				peer.Close()
+				return nil, fmt.Errorf("signaling channel closed")
 			}
+			if r.err != nil {
+				peer.Close()
+				return nil, fmt.Errorf("read signal: %w", r.err)
+			}
+			switch r.msg.Type {
+			case MsgTypeICECandidate:
+				_ = peer.AddICECandidate(r.msg.Payload)
+			case MsgTypeP2PReady:
+				p2pReady = true
+			case MsgTypeP2PFail:
+				peer.Close()
+				return nil, fmt.Errorf("peer reported p2p failure: %s", string(r.msg.Payload))
+			}
+		case <-negCtx.Done():
 			peer.Close()
-			return nil, err
-		}
-
-		switch msg.Type {
-		case MsgTypeICECandidate:
-			_ = peer.AddICECandidate(msg.Payload)
-		case MsgTypeP2PFail:
-			peer.Close()
-			return nil, fmt.Errorf("peer reported p2p failure: %s", string(msg.Payload))
+			return nil, negCtx.Err()
 		}
 	}
 }

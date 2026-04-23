@@ -65,11 +65,7 @@ func startTestRelay(t *testing.T) *httptest.Server {
 }
 
 // TestCLItoCLI tests the full sender -> receiver flow using Go transfer package.
-// v2 attempts WebRTC P2P first. Pion's SCTP-over-loopback timing is flaky on
-// macOS — the DC silently aborts ~50% of the time before the first send. Real
-// network ICE behaves differently. Skipped here; validate via the live relay.
 func TestCLItoCLI(t *testing.T) {
-	t.Skip("flaky on loopback in v2 (pion SCTP-over-loopback); validate against live relay")
 	relay := startTestRelay(t)
 	defer relay.Close()
 
@@ -146,9 +142,7 @@ func TestCLItoCLI(t *testing.T) {
 }
 
 // TestCLItoCLILargeFile tests transfer of a file larger than one chunk (64KB).
-// Skipped for the same reason as TestCLItoCLI above.
 func TestCLItoCLILargeFile(t *testing.T) {
-	t.Skip("flaky on loopback in v2 (pion SCTP-over-loopback); validate against live relay")
 	relay := startTestRelay(t)
 	defer relay.Close()
 

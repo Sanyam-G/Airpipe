@@ -126,21 +126,14 @@ func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total i
 
 	switch first.Type {
 	case MsgTypeSDPOffer:
+		// negotiateReceiver waits for both the DC to open AND P2PReady from
+		// the sender before returning. After it returns, the WS isn't read
+		// again on this side — chunks flow over the DC.
 		peer, err := negotiateReceiver(context.Background(), r.conn, r.key, string(first.Payload))
 		if err != nil {
 			return "", fmt.Errorf("p2p negotiation: %w", err)
 		}
 		defer peer.Close()
-
-		r.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
-		ready, err := readSignalMsg(r.conn, r.key)
-		if err != nil {
-			return "", fmt.Errorf("await p2p ready: %w", err)
-		}
-		r.conn.SetReadDeadline(time.Time{})
-		if ready.Type != MsgTypeP2PReady {
-			return "", fmt.Errorf("expected P2PReady, got type %#x", ready.Type)
-		}
 		return r.recvFile(r.peerReader(peer), destDir, progressFn, nil)
 
 	case MsgTypeP2PFail:
