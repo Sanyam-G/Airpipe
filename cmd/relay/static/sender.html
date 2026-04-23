@@ -54,6 +54,8 @@ input[type=file]{display:none}
 .filename{font-size:0.75rem;color:#ccc;background:#0a0a0a;border:1px dotted #222;padding:8px 12px;word-break:break-all;margin:8px 0}
 .size-info{font-size:0.7rem;color:#555;font-variant-numeric:tabular-nums;margin-bottom:8px}
 
+.transport{font-size:0.6rem;color:#00d4ff;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;min-height:0.6rem}
+
 .progress-wrap{width:100%;margin:8px 0}
 .progress-bar{background:#111;border:1px dotted #333;height:6px;overflow:hidden}
 .progress-fill{height:100%;background:#00d4ff;width:0%;transition:width 0.15s}
@@ -112,8 +114,15 @@ input[type=file]{display:none}
       <input type="file" id="fileinput">
     </div>
 
+    <div id="negotiating" class="hidden">
+      <div class="status">negotiating peer connection</div>
+      <div class="status-detail">attempting direct WebRTC, falling back to relay if needed</div>
+      <div class="dots"><span></span><span></span><span></span></div>
+    </div>
+
     <div id="sending" class="hidden">
       <div class="status">uploading</div>
+      <div class="transport" id="transport"></div>
       <div class="filename" id="filename">-</div>
       <div class="size-info" id="send-size"></div>
       <div class="progress-wrap">
@@ -126,6 +135,7 @@ input[type=file]{display:none}
     <div id="complete" class="hidden">
       <div class="checkmark">&check;</div>
       <div class="status" style="color:#00d4ff">transfer complete</div>
+      <div class="transport" id="done-transport"></div>
       <div class="filename" id="done-name">-</div>
       <div class="size-info" id="done-size"></div>
     </div>
@@ -149,6 +159,21 @@ input[type=file]{display:none}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/tweetnacl/1.0.3/nacl-fast.min.js"></script>
 <script>
 const CHUNK=64*1024;
+const PROTOCOL_VERSION=2;
+const NEGOTIATE_TIMEOUT_MS=15000;
+
+// Message types — must match internal/transfer/protocol.go
+const MSG_METADATA=0x01, MSG_READY=0x02, MSG_COMPLETE=0x03, MSG_ERROR=0x04;
+const MSG_CHUNK=0x10, MSG_VERSION=0x20;
+const MSG_SDP_OFFER=0x30, MSG_SDP_ANSWER=0x31, MSG_ICE_CANDIDATE=0x32;
+const MSG_P2P_READY=0x33, MSG_P2P_FAIL=0x34;
+
+const ICE_SERVERS=[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'stun:stun.cloudflare.com:3478'},
+];
+
 const token=location.pathname.split('/').pop();
 const keyHash=location.hash.slice(1);
 if(!token||!keyHash){showError('Invalid link');throw''}
@@ -172,25 +197,67 @@ function formatSpeed(bytesPerSec){
   return (bytesPerSec/1048576).toFixed(1)+' MB/s';
 }
 
-// WebSocket setup
+// Single WebSocket reader. Browser onmessage is sequential, so as long as
+// no other code calls ws.something on the receive path, we're safe — the
+// gorilla/websocket two-readers race only bites the Go side.
 const ws=new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/ws/'+token);
 ws.binaryType='arraybuffer';
+
+const waiters={}; // type byte -> resolver
+function awaitMsg(type,timeoutMs){
+  return new Promise((resolve,reject)=>{
+    waiters[type]=resolve;
+    if(timeoutMs){
+      setTimeout(()=>{
+        if(waiters[type]===resolve){delete waiters[type];reject(new Error('timeout waiting for type 0x'+type.toString(16)))}
+      },timeoutMs);
+    }
+  });
+}
+
+let pc=null,dc=null;
+
+ws.onmessage=async(evt)=>{
+  const enc=new Uint8Array(evt.data);
+  const dec=decrypt(enc,keyBytes);
+  if(!dec){return}
+  const msg=decode(dec);
+  if(!msg){return}
+  // ICE candidates stream in continuously — handle inline.
+  if(msg.type===MSG_ICE_CANDIDATE&&pc){
+    try{
+      const c=JSON.parse(new TextDecoder().decode(msg.payload));
+      await pc.addIceCandidate(c);
+    }catch(e){console.warn('addIceCandidate:',e)}
+    return;
+  }
+  // SDPAnswer is one-shot but processed inline (caller doesn't await it).
+  if(msg.type===MSG_SDP_ANSWER&&pc){
+    try{
+      await pc.setRemoteDescription({type:'answer',sdp:new TextDecoder().decode(msg.payload)});
+    }catch(e){console.warn('setRemoteDescription:',e)}
+    return;
+  }
+  // Resolve any pending awaiter.
+  if(waiters[msg.type]){
+    const w=waiters[msg.type];
+    delete waiters[msg.type];
+    w(msg);
+  }
+};
+
 ws.onopen=()=>{show('select')};
 ws.onerror=()=>{showError('Connection lost. Reload to retry.')};
 ws.onclose=()=>{
-  const sendingEl=document.getElementById('sending');
-  if(!sendingEl.classList.contains('hidden')){
+  if(!document.getElementById('sending').classList.contains('hidden')){
     showError('Connection closed during transfer');
   }
 };
 
-// Click to select
 const dropzone=document.getElementById('dropzone');
 const fileinput=document.getElementById('fileinput');
 dropzone.addEventListener('click',()=>fileinput.click());
 fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFile(e.target.files[0])});
-
-// Drag and drop
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>{dropzone.classList.remove('dragover')});
 dropzone.addEventListener('drop',(e)=>{
@@ -202,13 +269,74 @@ dropzone.addEventListener('drop',(e)=>{
 async function sendFile(file){
   document.getElementById('filename').textContent=file.name;
   document.getElementById('send-size').textContent=formatSize(file.size);
-  show('sending');
 
-  // Send protocol version handshake (0x20 = MsgTypeVersion, payload = [1])
-  ws.send(encrypt(encode(0x20,new Uint8Array([1])),keyBytes));
+  try{
+    // 1. Send Version(2)
+    ws.send(encrypt(encode(MSG_VERSION,new Uint8Array([PROTOCOL_VERSION])),keyBytes));
+    // 2. Wait for receiver Ready
+    await awaitMsg(MSG_READY,30000);
 
+    // 3. Try WebRTC P2P
+    show('negotiating');
+    let usingP2P=false;
+    try{
+      await negotiateP2P();
+      usingP2P=true;
+    }catch(e){
+      console.warn('p2p negotiation failed, falling back to relay:',e);
+      if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
+    }
+
+    show('sending');
+    if(usingP2P){
+      document.getElementById('transport').textContent='direct (WebRTC DataChannel)';
+      ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
+      await streamFile(file,sendDC);
+      // Drain the DC buffer before tearing down so Complete is delivered.
+      while(dc.bufferedAmount>0){await sleep(10)}
+    }else{
+      document.getElementById('transport').textContent='via relay (P2P unavailable)';
+      ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
+      await streamFile(file,sendWS);
+    }
+
+    document.getElementById('done-name').textContent=file.name;
+    document.getElementById('done-size').textContent=formatSize(file.size);
+    document.getElementById('done-transport').textContent=usingP2P?'direct (WebRTC)':'via relay';
+    show('complete');
+  }catch(err){
+    showError(err.message||String(err));
+  }
+}
+
+async function negotiateP2P(){
+  pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
+  // Negotiated DataChannel: both sides agree on ID up front, no
+  // OnDataChannel race. Mirrors what the Go peer does.
+  dc=pc.createDataChannel('airpipe',{ordered:true,id:1,negotiated:true});
+  dc.binaryType='arraybuffer';
+
+  pc.onicecandidate=(evt)=>{
+    if(evt.candidate){
+      const raw=new TextEncoder().encode(JSON.stringify(evt.candidate.toJSON()));
+      ws.send(encrypt(encode(MSG_ICE_CANDIDATE,raw),keyBytes));
+    }
+  };
+
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  ws.send(encrypt(encode(MSG_SDP_OFFER,new TextEncoder().encode(offer.sdp)),keyBytes));
+
+  await new Promise((resolve,reject)=>{
+    const t=setTimeout(()=>reject(new Error('datachannel open timeout')),NEGOTIATE_TIMEOUT_MS);
+    dc.onopen=()=>{clearTimeout(t);resolve()};
+    dc.onerror=(e)=>{clearTimeout(t);reject(e)};
+  });
+}
+
+async function streamFile(file,sendFn){
   const meta={filename:file.name,size:file.size,chunks:Math.ceil(file.size/CHUNK)};
-  ws.send(encrypt(encode(0x01,new TextEncoder().encode(JSON.stringify(meta))),keyBytes));
+  await sendFn(encode(MSG_METADATA,new TextEncoder().encode(JSON.stringify(meta))));
 
   let offset=0;
   const startTime=performance.now();
@@ -217,7 +345,7 @@ async function sendFile(file){
   while(offset<file.size){
     const end=Math.min(offset+CHUNK,file.size);
     const chunk=await file.slice(offset,end).arrayBuffer();
-    ws.send(encrypt(encode(0x10,new Uint8Array(chunk)),keyBytes));
+    await sendFn(encode(MSG_CHUNK,new Uint8Array(chunk)));
     offset=end;
 
     const now=performance.now();
@@ -226,27 +354,32 @@ async function sendFile(file){
       const pct=Math.round(offset/file.size*100);
       const elapsed=(now-startTime)/1000;
       const speed=elapsed>0?offset/elapsed:0;
-
-      await new Promise(resolve=>{
-        requestAnimationFrame(()=>{
-          document.getElementById('progress').style.width=pct+'%';
-          document.getElementById('ptext').textContent=pct+'% \u00b7 '+formatSize(offset)+' / '+formatSize(file.size);
-          document.getElementById('speed').textContent=formatSpeed(speed);
-          resolve();
-        });
-      });
+      await new Promise(resolve=>requestAnimationFrame(()=>{
+        document.getElementById('progress').style.width=pct+'%';
+        document.getElementById('ptext').textContent=pct+'% · '+formatSize(offset)+' / '+formatSize(file.size);
+        document.getElementById('speed').textContent=formatSpeed(speed);
+        resolve();
+      }));
     }
   }
 
-  ws.send(encrypt(encode(0x03,new Uint8Array(0)),keyBytes));
-
-  document.getElementById('done-name').textContent=file.name;
-  document.getElementById('done-size').textContent=formatSize(file.size);
-  show('complete');
+  await sendFn(encode(MSG_COMPLETE,new Uint8Array(0)));
 }
 
+async function sendDC(plaintext){
+  // Backpressure: pause if the DC's send buffer is filling up.
+  while(dc.bufferedAmount>8*1024*1024){await sleep(5)}
+  dc.send(encrypt(plaintext,keyBytes));
+}
+
+function sendWS(plaintext){
+  ws.send(encrypt(plaintext,keyBytes));
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
 function show(id){
-  ['connecting','select','sending','complete','error'].forEach(x=>document.getElementById(x).classList.add('hidden'));
+  ['connecting','select','negotiating','sending','complete','error'].forEach(x=>document.getElementById(x).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
 }
 
@@ -264,6 +397,13 @@ function encrypt(data,key){
   return r;
 }
 
+function decrypt(data,key){
+  if(data.length<24)return null;
+  const nonce=data.slice(0,24);
+  const ct=data.slice(24);
+  return nacl.secretbox.open(ct,nonce,key);
+}
+
 function encode(type,payload){
   const r=new Uint8Array(5+payload.length);
   r[0]=type;
@@ -273,6 +413,14 @@ function encode(type,payload){
   r[4]=payload.length&0xff;
   r.set(payload,5);
   return r;
+}
+
+function decode(data){
+  if(data.length<5)return null;
+  const type=data[0];
+  const len=(data[1]<<24)|(data[2]<<16)|(data[3]<<8)|data[4];
+  if(data.length<5+len)return null;
+  return {type,payload:data.slice(5,5+len)};
 }
 
 function b64decode(s){
