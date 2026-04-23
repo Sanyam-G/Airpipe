@@ -5,3 +5,19 @@ services:
     restart: unless-stopped
     ports:
       - "8088:8080"
+    labels:
+      com.centurylinklabs.watchtower.enable: "true"
+
+  # Optional. Polls ghcr.io every 5 min and auto-pulls + restarts any container
+  # with the watchtower.enable=true label. Drop this service if you want to
+  # control upgrades manually.
+  watchtower:
+    image: containrrr/watchtower
+    container_name: airpipe-watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_POLL_INTERVAL: "300"
