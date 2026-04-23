@@ -95,6 +95,8 @@ func negotiateSender(ctx context.Context, conn *websocket.Conn, key []byte) (*p2
 	for {
 		if peer.IsOpen() {
 			_ = conn.SetReadDeadline(time.Time{})
+			cancel()
+			<-trickleDone
 			return peer, nil
 		}
 		if err := negCtx.Err(); err != nil {
@@ -170,6 +172,8 @@ func negotiateReceiver(ctx context.Context, conn *websocket.Conn, key []byte, of
 	for {
 		if peer.IsOpen() {
 			_ = conn.SetReadDeadline(time.Time{})
+			cancel()
+			<-trickleDone
 			return peer, nil
 		}
 		if err := negCtx.Err(); err != nil {

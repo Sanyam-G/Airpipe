@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -103,9 +104,10 @@ func uniquePath(path string) string {
 	}
 }
 
-// ReceiveFile consumes a transfer over the relay WS. The path-traversal fix
-// lives inside recvFile via SafeFilename. v2 WebRTC support lives in
-// signaling.go + p2p/peer.go behind a future opt-in.
+// ReceiveFile consumes a transfer. The sender picks the transport by sending
+// SDPOffer (P2P attempt), P2PFail (sender already decided WS), or Metadata
+// directly (WS streaming first chunk). Path-traversal defense lives in
+// recvFile via SafeFilename.
 func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total int64)) (string, error) {
 	info, err := os.Stat(destDir)
 	if err != nil {
@@ -114,7 +116,42 @@ func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total i
 	if !info.IsDir() {
 		return "", fmt.Errorf("destination path %q is not a directory", destDir)
 	}
-	return r.recvFile(r.wsReader(), destDir, progressFn, nil)
+
+	r.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	first, err := readSignalMsg(r.conn, r.key)
+	if err != nil {
+		return "", fmt.Errorf("read first message: %w", err)
+	}
+	r.conn.SetReadDeadline(time.Time{})
+
+	switch first.Type {
+	case MsgTypeSDPOffer:
+		peer, err := negotiateReceiver(context.Background(), r.conn, r.key, string(first.Payload))
+		if err != nil {
+			return "", fmt.Errorf("p2p negotiation: %w", err)
+		}
+		defer peer.Close()
+
+		r.conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+		ready, err := readSignalMsg(r.conn, r.key)
+		if err != nil {
+			return "", fmt.Errorf("await p2p ready: %w", err)
+		}
+		r.conn.SetReadDeadline(time.Time{})
+		if ready.Type != MsgTypeP2PReady {
+			return "", fmt.Errorf("expected P2PReady, got type %#x", ready.Type)
+		}
+		return r.recvFile(r.peerReader(peer), destDir, progressFn, nil)
+
+	case MsgTypeP2PFail:
+		return r.recvFile(r.wsReader(), destDir, progressFn, nil)
+
+	case MsgTypeMetadata, MsgTypeChunk, MsgTypeComplete, MsgTypeError:
+		return r.recvFile(r.wsReader(), destDir, progressFn, &first)
+
+	default:
+		return "", fmt.Errorf("unexpected first message type: %#x", first.Type)
+	}
 }
 
 type msgReader func() (Message, error)

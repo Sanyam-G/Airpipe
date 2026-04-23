@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -67,9 +68,28 @@ func (s *Sender) WaitForReceiver(timeout time.Duration) error {
 	return nil
 }
 
-// SendFile streams the file through the relay. v2 WebRTC P2P lives in
-// signaling.go + p2p/peer.go, gated behind a future SendFileP2P entry point.
+// SendFile attempts a WebRTC P2P transfer first, falling back to streaming
+// through the relay WS when NAT punching fails or signaling times out. Bytes
+// are NaCl-encrypted on top of DTLS in both paths; a malicious relay can only
+// see ciphertext either way.
 func (s *Sender) SendFile(filePath string, progressFn func(sent, total int64)) error {
+	ctx := context.Background()
+
+	peer, err := negotiateSender(ctx, s.conn, s.key)
+	if err == nil {
+		if sigErr := writeSignalMsg(s.conn, s.key, NewP2PReadyMessage()); sigErr != nil {
+			peer.Close()
+			return fmt.Errorf("signal p2p ready: %w", sigErr)
+		}
+		streamErr := s.streamFile(peer.Send, filePath, progressFn)
+		// Drain the DataChannel before tearing down so the Complete message
+		// and any still-buffered chunks actually reach the receiver.
+		peer.WaitDrain(10 * time.Second)
+		peer.Close()
+		return streamErr
+	}
+
+	_ = writeSignalMsg(s.conn, s.key, NewP2PFailMessage(err.Error()))
 	wsSend := func(data []byte) error {
 		return s.conn.WriteMessage(websocket.BinaryMessage, data)
 	}

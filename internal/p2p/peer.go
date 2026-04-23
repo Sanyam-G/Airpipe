@@ -58,8 +58,7 @@ type Peer struct {
 	bytesReceived atomic.Int64
 }
 
-// NewPeer builds a Peer. Offerers get a DataChannel straight away; answerers
-// get one asynchronously when SetRemoteOffer is called with a matching offer.
+// NewPeer builds a Peer. Both sides create a negotiated DataChannel.
 func NewPeer(role Role, cfg Config) (*Peer, error) {
 	if cfg.ICEServers == nil {
 		cfg.ICEServers = DefaultICEServers
@@ -78,7 +77,7 @@ func NewPeer(role Role, cfg Config) (*Peer, error) {
 		pc:              pc,
 		role:            role,
 		cfg:             cfg,
-		localCandidates: make(chan webrtc.ICECandidateInit, 32),
+		localCandidates: make(chan webrtc.ICECandidateInit, 64),
 		dataChannelOpen: make(chan struct{}),
 		incoming:        make(chan []byte, 32),
 		closed:          make(chan struct{}),
@@ -88,31 +87,40 @@ func NewPeer(role Role, cfg Config) (*Peer, error) {
 		if c == nil {
 			return
 		}
+		// Non-blocking publish: if the consumer has stopped reading (buffer
+		// full) we drop the candidate rather than stall pion's ICE agent.
+		// Blocking here starved the agent and eventually caused DTLS/SCTP
+		// consent failure, which aborted an otherwise-healthy DataChannel.
 		select {
 		case p.localCandidates <- c.ToJSON():
-		case <-p.closed:
+		default:
 		}
 	})
 
 	pc.OnConnectionStateChange(func(s webrtc.PeerConnectionState) {
-		if s == webrtc.PeerConnectionStateFailed || s == webrtc.PeerConnectionStateClosed || s == webrtc.PeerConnectionStateDisconnected {
+		// Disconnected is transient (ICE flap) and recoverable — only tear
+		// down on genuinely terminal states.
+		if s == webrtc.PeerConnectionStateFailed || s == webrtc.PeerConnectionStateClosed {
 			p.Close()
 		}
 	})
 
-	if role == RoleOfferer {
-		ordered := true
-		dc, dcErr := pc.CreateDataChannel("airpipe", &webrtc.DataChannelInit{Ordered: &ordered})
-		if dcErr != nil {
-			pc.Close()
-			return nil, fmt.Errorf("create data channel: %w", dcErr)
-		}
-		p.attachDataChannel(dc)
-	} else {
-		pc.OnDataChannel(func(dc *webrtc.DataChannel) {
-			p.attachDataChannel(dc)
-		})
+	// Use a negotiated DataChannel: both sides create with the same ID, so
+	// OnDataChannel is never needed. Eliminates the race where the offerer's
+	// OnOpen fires before the answerer has had a chance to register handlers.
+	ordered := true
+	dcID := uint16(1)
+	negotiated := true
+	dc, dcErr := pc.CreateDataChannel("airpipe", &webrtc.DataChannelInit{
+		Ordered:    &ordered,
+		ID:         &dcID,
+		Negotiated: &negotiated,
+	})
+	if dcErr != nil {
+		pc.Close()
+		return nil, fmt.Errorf("create data channel: %w", dcErr)
 	}
+	p.attachDataChannel(dc)
 
 	return p, nil
 }
@@ -246,7 +254,8 @@ func (p *Peer) Send(data []byte) error {
 		}
 	}
 	if err := p.dc.Send(data); err != nil {
-		return err
+		return fmt.Errorf("dc.Send failed (state=%s, pc=%s, len=%d): %w",
+			p.dc.ReadyState(), p.pc.ConnectionState(), len(data), err)
 	}
 	p.bytesSent.Add(int64(len(data)))
 	return nil
@@ -287,3 +296,23 @@ func (p *Peer) BytesSent() int64 { return p.bytesSent.Load() }
 
 // BytesReceived reports application bytes read from the DataChannel.
 func (p *Peer) BytesReceived() int64 { return p.bytesReceived.Load() }
+
+// WaitDrain blocks until the DataChannel's send buffer is empty, or until the
+// timeout elapses, or until the peer closes. Call before Close() so that
+// in-flight messages aren't dropped by an immediate teardown.
+func (p *Peer) WaitDrain(timeout time.Duration) {
+	if p.dc == nil {
+		return
+	}
+	deadline := time.Now().Add(timeout)
+	for p.dc.BufferedAmount() > 0 {
+		if time.Now().After(deadline) {
+			return
+		}
+		select {
+		case <-time.After(10 * time.Millisecond):
+		case <-p.closed:
+			return
+		}
+	}
+}
