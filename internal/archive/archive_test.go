@@ -92,3 +92,53 @@ func TestZipNonexistent(t *testing.T) {
 		t.Fatal("expected error for nonexistent path")
 	}
 }
+
+func TestZipRefusesSymlinkAtTopLevel(t *testing.T) {
+	tmp := t.TempDir()
+	target := filepath.Join(tmp, "target.txt")
+	os.WriteFile(target, []byte("secret"), 0644)
+	link := filepath.Join(tmp, "link.txt")
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("symlink not supported: %v", err)
+	}
+
+	_, err := ZipPaths([]string{link})
+	if err == nil {
+		t.Fatal("expected ZipPaths to refuse a top-level symlink")
+	}
+}
+
+func TestZipSkipsSymlinksInsideDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	dir := filepath.Join(tmp, "bundle")
+	os.MkdirAll(dir, 0755)
+	os.WriteFile(filepath.Join(dir, "real.txt"), []byte("visible"), 0644)
+
+	// A symlink inside the directory pointing outside — a classic attempt to
+	// smuggle sensitive files out via an archive.
+	outside := filepath.Join(tmp, "sensitive.txt")
+	os.WriteFile(outside, []byte("do-not-leak"), 0644)
+	if err := os.Symlink(outside, filepath.Join(dir, "leak.txt")); err != nil {
+		t.Skipf("symlink not supported: %v", err)
+	}
+
+	zipPath, err := ZipPaths([]string{dir})
+	if err != nil {
+		t.Fatalf("ZipPaths failed: %v", err)
+	}
+	defer os.Remove(zipPath)
+
+	r, _ := zip.OpenReader(zipPath)
+	defer r.Close()
+
+	names := map[string]bool{}
+	for _, f := range r.File {
+		names[f.Name] = true
+	}
+	if !names["bundle/real.txt"] {
+		t.Fatal("missing bundle/real.txt")
+	}
+	if names["bundle/leak.txt"] {
+		t.Fatal("symlink leak.txt should have been skipped but was archived")
+	}
+}

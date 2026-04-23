@@ -2,20 +2,49 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"io"
+	"log/slog"
 	"mime/multipart"
-	"strings"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
 
+func newTestLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+func newTestServer(t *testing.T) *server {
+	t.Helper()
+	log := newTestLogger()
+	ctx := context.Background()
+	s := &server{
+		cfg: config{
+			allowAnyOrigin:  true,
+			rateLimitPerMin: 10000,
+		},
+		log:         log,
+		fileStore:   NewFileStore(ctx, log),
+		roomManager: NewRoomManager(ctx, log),
+		rl:          newIPLimiter(10000),
+	}
+	s.upgrader = websocket.Upgrader{CheckOrigin: originChecker(s.cfg, log)}
+	t.Cleanup(func() {
+		s.fileStore.Shutdown()
+		s.roomManager.Shutdown()
+	})
+	return s
+}
+
 func TestRoomManagerCreateAndGet(t *testing.T) {
-	rm := NewRoomManager()
+	rm := NewRoomManager(context.Background(), newTestLogger())
+	defer rm.Shutdown()
 	room := rm.GetOrCreateRoom("abc123")
 	if room == nil {
 		t.Fatal("expected room, got nil")
@@ -31,7 +60,8 @@ func TestRoomManagerCreateAndGet(t *testing.T) {
 }
 
 func TestRoomManagerDifferentTokens(t *testing.T) {
-	rm := NewRoomManager()
+	rm := NewRoomManager(context.Background(), newTestLogger())
+	defer rm.Shutdown()
 	room1 := rm.GetOrCreateRoom("token1")
 	room2 := rm.GetOrCreateRoom("token2")
 	if room1 == room2 {
@@ -40,7 +70,8 @@ func TestRoomManagerDifferentTokens(t *testing.T) {
 }
 
 func TestRoomManagerDelete(t *testing.T) {
-	rm := NewRoomManager()
+	rm := NewRoomManager(context.Background(), newTestLogger())
+	defer rm.Shutdown()
 	rm.GetOrCreateRoom("delete-me")
 	rm.DeleteRoom("delete-me")
 
@@ -51,12 +82,13 @@ func TestRoomManagerDelete(t *testing.T) {
 }
 
 func TestRoomAddClientLimit(t *testing.T) {
+	s := newTestServer(t)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /ws/{token}", handleWebSocket)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	mux.HandleFunc("GET /ws/{token}", s.handleWebSocket)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
 
-	wsURL := "ws" + server.URL[4:] + "/ws/limit-test"
+	wsURL := "ws" + srv.URL[4:] + "/ws/limit-test"
 
 	dialer := websocket.Dialer{}
 	conn1, _, err := dialer.Dial(wsURL, nil)
@@ -84,7 +116,7 @@ func TestRoomAddClientLimit(t *testing.T) {
 }
 
 func TestRoomCleanup(t *testing.T) {
-	rm := &RoomManager{rooms: make(map[string]*Room)}
+	rm := &RoomManager{rooms: make(map[string]*Room), log: newTestLogger()}
 
 	rm.rooms["old"] = &Room{
 		token:     "old",
@@ -116,10 +148,9 @@ func TestRoomCleanup(t *testing.T) {
 }
 
 func TestHealthEndpoint(t *testing.T) {
+	s := newTestServer(t)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"status":"ok"}`))
-	})
+	mux.HandleFunc("GET /health", s.handleHealth)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	w := httptest.NewRecorder()
@@ -128,14 +159,25 @@ func TestHealthEndpoint(t *testing.T) {
 	if w.Code != 200 {
 		t.Fatalf("expected 200, got %d", w.Code)
 	}
-	if w.Body.String() != `{"status":"ok"}` {
-		t.Fatalf("unexpected body: %s", w.Body.String())
+	var body map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &body); err != nil {
+		t.Fatalf("health response not JSON: %v (%s)", err, w.Body.String())
+	}
+	if body["status"] != "ok" {
+		t.Fatalf("expected status=ok, got %v", body["status"])
+	}
+	if _, ok := body["version"]; !ok {
+		t.Fatal("health missing version field")
+	}
+	if _, ok := body["protocol_version"]; !ok {
+		t.Fatal("health missing protocol_version field")
 	}
 }
 
 func TestUploadPageEndpoint(t *testing.T) {
+	s := newTestServer(t)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /u/{token}", handleUploadPage)
+	mux.HandleFunc("GET /u/{token}", s.handleUploadPage)
 
 	req := httptest.NewRequest("GET", "/u/testtoken", nil)
 	w := httptest.NewRecorder()
@@ -150,7 +192,8 @@ func TestUploadPageEndpoint(t *testing.T) {
 }
 
 func TestFileStoreRoundtrip(t *testing.T) {
-	fs := NewFileStore()
+	fs := NewFileStore(context.Background(), newTestLogger())
+	defer fs.Shutdown()
 	content := []byte("hello airpipe")
 
 	token, err := fs.Store("test.txt", bytes.NewReader(content), "")
@@ -174,7 +217,8 @@ func TestFileStoreRoundtrip(t *testing.T) {
 }
 
 func TestFileStoreNotFound(t *testing.T) {
-	fs := NewFileStore()
+	fs := NewFileStore(context.Background(), newTestLogger())
+	defer fs.Shutdown()
 	_, ok := fs.Get("nonexistent")
 	if ok {
 		t.Fatal("expected not found for nonexistent token")
@@ -182,21 +226,21 @@ func TestFileStoreNotFound(t *testing.T) {
 }
 
 func TestUploadAndDownload(t *testing.T) {
+	s := newTestServer(t)
 	mux := http.NewServeMux()
-	mux.HandleFunc("POST /upload", handleUploadFile)
-	mux.HandleFunc("GET /d/{token}", handleDownloadPage)
-	mux.HandleFunc("GET /raw/{token}", handleRawDownload)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	mux.HandleFunc("POST /upload", s.handleUploadFile)
+	mux.HandleFunc("GET /d/{token}", s.handleDownloadPage)
+	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
 
-	// Upload
 	body := &bytes.Buffer{}
 	mw := multipart.NewWriter(body)
 	part, _ := mw.CreateFormFile("file", "encrypted.bin")
 	part.Write([]byte("ciphertext-bytes"))
 	mw.Close()
 
-	resp, err := http.Post(server.URL+"/upload", mw.FormDataContentType(), body)
+	resp, err := http.Post(srv.URL+"/upload", mw.FormDataContentType(), body)
 	if err != nil {
 		t.Fatalf("upload request failed: %v", err)
 	}
@@ -216,8 +260,7 @@ func TestUploadAndDownload(t *testing.T) {
 		t.Fatal("empty token in response")
 	}
 
-	// /d/ should serve HTML download page
-	dlResp, err := http.Get(server.URL + "/d/" + result.Token)
+	dlResp, err := http.Get(srv.URL + "/d/" + result.Token)
 	if err != nil {
 		t.Fatalf("download page request failed: %v", err)
 	}
@@ -232,8 +275,7 @@ func TestUploadAndDownload(t *testing.T) {
 		t.Fatalf("expected text/html, got %s", ct)
 	}
 
-	// /raw/ should serve the raw encrypted bytes
-	rawResp, err := http.Get(server.URL + "/raw/" + result.Token)
+	rawResp, err := http.Get(srv.URL + "/raw/" + result.Token)
 	if err != nil {
 		t.Fatalf("raw download request failed: %v", err)
 	}
@@ -250,19 +292,74 @@ func TestUploadAndDownload(t *testing.T) {
 }
 
 func TestDownloadNotFound(t *testing.T) {
+	s := newTestServer(t)
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /d/{token}", handleDownloadPage)
-	mux.HandleFunc("GET /raw/{token}", handleRawDownload)
-	server := httptest.NewServer(mux)
-	defer server.Close()
+	mux.HandleFunc("GET /d/{token}", s.handleDownloadPage)
+	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
 
-	resp, _ := http.Get(server.URL + "/d/nonexistent")
+	resp, _ := http.Get(srv.URL + "/d/nonexistent")
 	if resp.StatusCode != 404 {
 		t.Fatalf("expected 404, got %d", resp.StatusCode)
 	}
 
-	rawResp, _ := http.Get(server.URL + "/raw/nonexistent")
+	rawResp, _ := http.Get(srv.URL + "/raw/nonexistent")
 	if rawResp.StatusCode != 404 {
 		t.Fatalf("expected 404, got %d", rawResp.StatusCode)
+	}
+}
+
+func TestOriginAllowlist(t *testing.T) {
+	log := newTestLogger()
+	cfg := config{
+		allowedOrigins: []string{"https://airpipe.sanyamgarg.com"},
+	}
+	check := originChecker(cfg, log)
+
+	cases := []struct {
+		origin string
+		allow  bool
+	}{
+		{"", true}, // CLI clients (no Origin header)
+		{"https://airpipe.sanyamgarg.com", true},
+		{"https://AIRPIPE.SANYAMGARG.COM", true},
+		{"https://evil.example.com", false},
+		{"http://airpipe.sanyamgarg.com", false}, // scheme mismatch
+	}
+	for _, c := range cases {
+		r := httptest.NewRequest("GET", "/ws/x", nil)
+		if c.origin != "" {
+			r.Header.Set("Origin", c.origin)
+		}
+		if got := check(r); got != c.allow {
+			t.Errorf("origin %q: got allow=%v, want %v", c.origin, got, c.allow)
+		}
+	}
+}
+
+func TestRateLimit(t *testing.T) {
+	log := newTestLogger()
+	il := newIPLimiter(2) // 2 per minute = tight burst
+	handler := rateLimit(il, log, func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+	})
+
+	call := func() int {
+		r := httptest.NewRequest("GET", "/upload", nil)
+		r.RemoteAddr = "1.2.3.4:5678"
+		w := httptest.NewRecorder()
+		handler(w, r)
+		return w.Code
+	}
+
+	if code := call(); code != 200 {
+		t.Fatalf("first call should pass, got %d", code)
+	}
+	if code := call(); code != 200 {
+		t.Fatalf("second call should pass (burst=2), got %d", code)
+	}
+	if code := call(); code != 429 {
+		t.Fatalf("third call should be rate-limited, got %d", code)
 	}
 }
