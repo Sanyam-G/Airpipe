@@ -18,6 +18,7 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     environment:
+      DOCKER_API_VERSION: "1.40"
       WATCHTOWER_LABEL_ENABLE: "true"
       WATCHTOWER_CLEANUP: "true"
       WATCHTOWER_POLL_INTERVAL: "300"
