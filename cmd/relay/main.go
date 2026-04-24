@@ -569,6 +569,19 @@ func (s *server) handleUploadPage(w http.ResponseWriter, r *http.Request) {
 	writeStatic(w, "sender.html")
 }
 
+func (s *server) handleLiveSendPage(w http.ResponseWriter, r *http.Request) {
+	writeStatic(w, "live-send.html")
+}
+
+func (s *server) handleLiveReceivePage(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if token == "" || !validToken.MatchString(token) {
+		http.Error(w, "invalid token", http.StatusBadRequest)
+		return
+	}
+	writeStatic(w, "live-receive.html")
+}
+
 func (s *server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
@@ -645,6 +658,8 @@ func main() {
 	mux.HandleFunc("GET /d/{token}", s.handleDownloadPage)
 	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
 	mux.HandleFunc("GET /u/{token}", s.handleUploadPage)
+	mux.HandleFunc("GET /live", s.handleLiveSendPage)
+	mux.HandleFunc("GET /live/{token}", s.handleLiveReceivePage)
 	mux.HandleFunc("GET /ws/{token}", rateLimit(s.rl, log, s.handleWebSocket))
 	mux.HandleFunc("GET /health", s.handleHealth)
 

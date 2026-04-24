@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AIRPIPE / LIVE SEND</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=VT323&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=20260423">
+</head>
+<body>
+
+<header class="top-strip">
+  <div class="strip-cell brand"><a href="/" style="color:inherit;text-decoration:none">AIRPIPE</a></div>
+  <div class="strip-cell stacked">
+    <span class="mono-tiny">FLOW</span>
+    <span class="mono-big">LIVE SEND</span>
+  </div>
+  <div class="strip-cell tagline">
+    <span>BROWSER → BROWSER · WEBRTC P2P · RELAY FALLBACK</span>
+  </div>
+  <div class="strip-cell stacked">
+    <span class="mono-tiny">RELAY_TIME</span>
+    <span class="mono-big" id="top-clock">--:--:--</span>
+  </div>
+  <div class="strip-cell status" id="ws-status"><span class="dot"></span>CONNECTING</div>
+  <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener" class="strip-cell port-btn">
+    <span>SOURCE</span><span class="arrow">→</span>
+  </a>
+</header>
+
+<main class="grid single">
+
+  <section id="waiting" class="block" data-label="01">
+    <div class="status-row">
+      <span class="status-label">STATUS</span>
+      <span class="status-val">waiting for receiver</span>
+    </div>
+    <p class="block-sub">Share the link or QR with your receiver. They open it, both browsers pair through the relay, then you pick a file. Relay only sees ciphertext signaling.</p>
+    <div class="phrase-display">
+      <div class="phrase-words" id="phrase-display" onclick="copyPhrase()">-</div>
+      <div class="phrase-hint">tap to copy · session-scoped, not a passphrase</div>
+    </div>
+    <div class="qr-wrap" id="qr"></div>
+    <div class="code-block" onclick="copyURL()">
+      <code id="share-url">-</code>
+      <span class="copied" id="copy-badge">COPIED</span>
+    </div>
+    <div class="dots"><span></span><span></span><span></span></div>
+  </section>
+
+  <section id="select" class="block hidden" data-label="02">
+    <div class="status-row">
+      <span class="status-label">STATUS</span>
+      <span class="status-val">receiver connected</span>
+    </div>
+    <p class="block-sub">Drop a file. It encrypts in your browser, negotiates WebRTC, then streams direct to the receiver. Falls back to relay streaming if NAT punching fails.</p>
+    <div class="drop-zone" id="dropzone">
+      <div class="drop-icon">+</div>
+      <div class="drop-label">tap to select or <strong>drop a file</strong></div>
+      <div class="drop-hint">any type · any size</div>
+    </div>
+    <input type="file" id="fileinput">
+  </section>
+
+  <section id="negotiating" class="block hidden" data-label="03">
+    <div class="status-row">
+      <span class="status-label">STATUS</span>
+      <span class="status-val">negotiating peer</span>
+    </div>
+    <div class="filename" id="neg-name">-</div>
+    <p class="block-sub">Trickling ICE candidates, attempting direct WebRTC. Falls back to relay-streaming after 15s if NAT punching fails.</p>
+    <div class="dots"><span></span><span></span><span></span></div>
+  </section>
+
+  <section id="sending" class="block hidden" data-label="04">
+    <div class="status-row">
+      <span class="status-label">STATUS</span>
+      <span class="status-val">sending</span>
+    </div>
+    <div class="transport" id="transport"></div>
+    <div class="filename" id="filename">-</div>
+    <div class="size-info" id="send-size"></div>
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+      <div class="progress-text" id="ptext">0%</div>
+    </div>
+    <div class="speed-info" id="speed"></div>
+  </section>
+
+  <section id="complete" class="block hidden" data-label="OK">
+    <div class="checkmark">✓</div>
+    <h2 style="color:var(--accent)">TRANSFER COMPLETE</h2>
+    <div class="transport" id="done-transport"></div>
+    <div class="filename" id="done-name">-</div>
+    <div class="size-info" id="done-size"></div>
+    <p class="block-sub">Reload to send another file.</p>
+  </section>
+
+  <section id="error" class="block hidden" data-label="!!">
+    <h2 style="color:var(--accent)">ERROR</h2>
+    <div class="filename" id="errmsg">-</div>
+    <p class="block-sub">Reload to start over.</p>
+  </section>
+
+</main>
+
+<footer class="bottom-strip">
+  <div class="strip-cell">END_TO_END · NACL_SECRETBOX + DTLS</div>
+  <div class="strip-cell">RELAY_NEVER_SEES_PLAINTEXT</div>
+  <div class="strip-cell"><a href="/">RETURN_HOME →</a></div>
+</footer>
+
+<script src="/static/nacl-fast.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+const CHUNK=64*1024;
+const NEGOTIATE_TIMEOUT_MS=15000;
+
+const MSG_METADATA=0x01, MSG_READY=0x02, MSG_COMPLETE=0x03, MSG_ERROR=0x04;
+const MSG_CHUNK=0x10;
+const MSG_SDP_OFFER=0x30, MSG_SDP_ANSWER=0x31, MSG_ICE_CANDIDATE=0x32;
+const MSG_P2P_READY=0x33, MSG_P2P_FAIL=0x34, MSG_PEER_JOIN=0x35;
+
+const ICE_SERVERS=[
+  {urls:'stun:stun.l.google.com:19302'},
+  {urls:'stun:stun1.l.google.com:19302'},
+  {urls:'stun:stun.cloudflare.com:3478'},
+];
+
+function $(id){return document.getElementById(id)}
+
+function randomHex(nBytes){
+  const b=nacl.randomBytes(nBytes);
+  return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function b64encode(bytes){
+  let bin='';for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+}
+function formatSize(bytes){
+  if(bytes===0)return '0 B';
+  const units=['B','KB','MB','GB'];
+  const i=Math.floor(Math.log(bytes)/Math.log(1024));
+  return (bytes/Math.pow(1024,i)).toFixed(i===0?0:1)+' '+units[i];
+}
+function formatSpeed(bps){
+  if(bps<1024)return bps.toFixed(0)+' B/s';
+  if(bps<1048576)return (bps/1024).toFixed(1)+' KB/s';
+  return (bps/1048576).toFixed(1)+' MB/s';
+}
+function encrypt(data,key){
+  const nonce=nacl.randomBytes(24);
+  const enc=nacl.secretbox(data,nonce,key);
+  const r=new Uint8Array(24+enc.length);
+  r.set(nonce);r.set(enc,24);
+  return r;
+}
+function decrypt(data,key){
+  if(data.length<24)return null;
+  const nonce=data.slice(0,24);
+  const ct=data.slice(24);
+  return nacl.secretbox.open(ct,nonce,key);
+}
+function encode(type,payload){
+  const r=new Uint8Array(5+payload.length);
+  r[0]=type;
+  r[1]=(payload.length>>24)&0xff;
+  r[2]=(payload.length>>16)&0xff;
+  r[3]=(payload.length>>8)&0xff;
+  r[4]=payload.length&0xff;
+  r.set(payload,5);
+  return r;
+}
+function decode(data){
+  if(data.length<5)return null;
+  const type=data[0];
+  const len=(data[1]<<24)|(data[2]<<16)|(data[3]<<8)|data[4];
+  if(data.length<5+len)return null;
+  return {type,payload:data.slice(5,5+len)};
+}
+function show(id){
+  ['waiting','select','negotiating','sending','complete','error'].forEach(x=>$(x).classList.add('hidden'));
+  $(id).classList.remove('hidden');
+}
+function showError(msg){
+  phase='error';
+  show('error');
+  $('errmsg').textContent=msg;
+}
+
+const token=randomHex(8);
+const keyBytes=nacl.randomBytes(32);
+const shareURL=location.origin+'/live/'+token+'#'+b64encode(keyBytes);
+
+let currentPhrase=token.match(/.{1,4}/g).join(' ').toUpperCase();
+$('phrase-display').textContent=currentPhrase;
+$('share-url').textContent=shareURL;
+
+function copyURL(){
+  navigator.clipboard.writeText(shareURL);
+  const badge=$('copy-badge');
+  badge.classList.add('show');
+  setTimeout(()=>badge.classList.remove('show'),1500);
+}
+function copyPhrase(){
+  navigator.clipboard.writeText(shareURL);
+  const badge=$('copy-badge');
+  badge.classList.add('show');
+  setTimeout(()=>badge.classList.remove('show'),1500);
+}
+
+(function renderQR(){
+  const qr=qrcode(0,'M');
+  qr.addData(shareURL);
+  qr.make();
+  const modules=qr.getModuleCount();
+  const cellSize=Math.max(3,Math.floor(240/modules));
+  const canvas=document.createElement('canvas');
+  const size=modules*cellSize;
+  canvas.width=size;canvas.height=size;
+  const ctx=canvas.getContext('2d');
+  ctx.fillStyle='#f5f2eb';ctx.fillRect(0,0,size,size);
+  ctx.fillStyle='#0a0a0a';
+  for(let r=0;r<modules;r++){
+    for(let c=0;c<modules;c++){
+      if(qr.isDark(r,c)) ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize);
+    }
+  }
+  $('qr').innerHTML='';
+  $('qr').appendChild(canvas);
+})();
+
+const ws=new WebSocket((location.protocol==='https:'?'wss:':'ws:')+'//'+location.host+'/ws/'+token);
+ws.binaryType='arraybuffer';
+
+let pc=null, dc=null;
+let phase='waiting';
+let peerJoined=false;
+
+ws.onopen=()=>{
+  const s=$('ws-status');
+  s.classList.remove('err');s.classList.add('live');
+  s.innerHTML='<span class="dot"></span>RELAY_LINKED';
+};
+
+ws.onerror=()=>{
+  const s=$('ws-status');
+  s.classList.remove('live');s.classList.add('err');
+  s.innerHTML='<span class="dot"></span>WS_ERROR';
+  showError('Connection to relay lost. Reload to retry.');
+};
+
+ws.onclose=()=>{
+  if(phase==='sending'||phase==='negotiating'){
+    showError('Connection closed during '+phase+'. Receiver may have disconnected.');
+  }
+};
+
+ws.onmessage=async(evt)=>{
+  const enc=new Uint8Array(evt.data);
+  const dec=decrypt(enc,keyBytes);
+  if(!dec){
+    return;
+  }
+  const msg=decode(dec);
+  if(!msg)return;
+
+  if(msg.type===MSG_PEER_JOIN){
+    if(!peerJoined){
+      peerJoined=true;
+      phase='select';
+      show('select');
+    }
+    return;
+  }
+  if(msg.type===MSG_ICE_CANDIDATE&&pc){
+    try{
+      const c=JSON.parse(new TextDecoder().decode(msg.payload));
+      await pc.addIceCandidate(c);
+    }catch(e){console.warn('addIceCandidate:',e)}
+    return;
+  }
+  if(msg.type===MSG_SDP_ANSWER&&pc){
+    try{
+      await pc.setRemoteDescription({type:'answer',sdp:new TextDecoder().decode(msg.payload)});
+    }catch(e){console.warn('setRemoteDescription:',e)}
+    return;
+  }
+};
+
+const dropzone=$('dropzone');
+const fileinput=$('fileinput');
+dropzone.addEventListener('click',()=>fileinput.click());
+fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFile(e.target.files[0])});
+dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
+dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
+dropzone.addEventListener('drop',(e)=>{
+  e.preventDefault();
+  dropzone.classList.remove('dragover');
+  if(e.dataTransfer.files.length)sendFile(e.dataTransfer.files[0]);
+});
+
+async function sendFile(file){
+  $('filename').textContent=file.name;
+  $('send-size').textContent=formatSize(file.size);
+  $('neg-name').textContent=file.name;
+
+  try{
+    phase='negotiating';
+    show('negotiating');
+
+    let usingP2P=false;
+    try{
+      await negotiateP2P();
+      usingP2P=true;
+    }catch(e){
+      console.warn('p2p negotiation failed, falling back to relay:',e);
+      if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
+    }
+
+    phase='sending';
+    show('sending');
+    if(usingP2P){
+      $('transport').textContent='direct · WebRTC DataChannel';
+      ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
+      await streamFile(file,sendDC);
+      while(dc.bufferedAmount>0){await sleep(10)}
+    }else{
+      $('transport').textContent='via relay · P2P unavailable';
+      ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
+      await streamFile(file,sendWS);
+    }
+
+    phase='complete';
+    $('done-name').textContent=file.name;
+    $('done-size').textContent=formatSize(file.size);
+    $('done-transport').textContent=usingP2P?'direct · WebRTC':'via relay';
+    show('complete');
+  }catch(err){
+    showError(err.message||String(err));
+  }
+}
+
+async function negotiateP2P(){
+  pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
+  dc=pc.createDataChannel('airpipe',{ordered:true,id:1,negotiated:true});
+  dc.binaryType='arraybuffer';
+
+  pc.onicecandidate=(evt)=>{
+    if(evt.candidate){
+      const raw=new TextEncoder().encode(JSON.stringify(evt.candidate.toJSON()));
+      ws.send(encrypt(encode(MSG_ICE_CANDIDATE,raw),keyBytes));
+    }
+  };
+
+  const offer=await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  ws.send(encrypt(encode(MSG_SDP_OFFER,new TextEncoder().encode(offer.sdp)),keyBytes));
+
+  await new Promise((resolve,reject)=>{
+    const t=setTimeout(()=>reject(new Error('datachannel open timeout')),NEGOTIATE_TIMEOUT_MS);
+    dc.onopen=()=>{clearTimeout(t);resolve()};
+    dc.onerror=(e)=>{clearTimeout(t);reject(e)};
+  });
+}
+
+async function streamFile(file,sendFn){
+  const meta={filename:file.name,size:file.size,chunks:Math.ceil(file.size/CHUNK)};
+  await sendFn(encode(MSG_METADATA,new TextEncoder().encode(JSON.stringify(meta))));
+
+  let offset=0;
+  const startTime=performance.now();
+  let lastUIUpdate=0;
+
+  while(offset<file.size){
+    const end=Math.min(offset+CHUNK,file.size);
+    const chunk=await file.slice(offset,end).arrayBuffer();
+    await sendFn(encode(MSG_CHUNK,new Uint8Array(chunk)));
+    offset=end;
+
+    const now=performance.now();
+    if(now-lastUIUpdate>50||offset>=file.size){
+      lastUIUpdate=now;
+      const pct=Math.round(offset/file.size*100);
+      const elapsed=(now-startTime)/1000;
+      const speed=elapsed>0?offset/elapsed:0;
+      await new Promise(resolve=>requestAnimationFrame(()=>{
+        $('progress').style.width=pct+'%';
+        $('ptext').textContent=pct+'% · '+formatSize(offset)+' / '+formatSize(file.size);
+        $('speed').textContent=formatSpeed(speed);
+        resolve();
+      }));
+    }
+  }
+
+  await sendFn(encode(MSG_COMPLETE,new Uint8Array(0)));
+}
+
+async function sendDC(plaintext){
+  while(dc.bufferedAmount>8*1024*1024){await sleep(5)}
+  dc.send(encrypt(plaintext,keyBytes));
+}
+
+function sendWS(plaintext){
+  ws.send(encrypt(plaintext,keyBytes));
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+function tickClock(){
+  const d=new Date();
+  const pad=(n)=>String(n).padStart(2,'0');
+  $('top-clock').textContent=pad(d.getUTCHours())+':'+pad(d.getUTCMinutes())+':'+pad(d.getUTCSeconds());
+}
+tickClock();
+setInterval(tickClock,1000);
+</script>
+</body>
+</html>
