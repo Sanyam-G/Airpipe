@@ -5,11 +5,15 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AIRPIPE · encrypted P2P file transfer</title>
 <meta name="description" content="Encrypted peer-to-peer file transfer. WebRTC direct, relay fallback. No accounts. Open source.">
+<meta property="og:title" content="AirPipe">
+<meta property="og:description" content="Encrypted peer-to-peer file transfer. WebRTC direct, relay fallback.">
+<meta property="og:url" content="https://airpipe.sanyamgarg.com">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20260424a">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=20260510a">
 </head>
 <body class="landing-body">
 
@@ -43,29 +47,23 @@
     <div class="hero-anim">
       <svg viewBox="0 0 800 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="Two devices handshake through the relay then transfer a file directly peer to peer">
         <defs>
-          <!-- Motion paths -->
-          <path id="p-sr"      d="M 180 175 L 348 96"/>
-          <path id="p-rs"      d="M 348 96 L 180 175"/>
-          <path id="p-rr"      d="M 452 96 L 620 175"/>
-          <path id="p-rrev"    d="M 620 175 L 452 96"/>
-          <path id="p-direct"  d="M 180 270 L 620 270"/>
+          <path id="p-direct" d="M 180 270 L 620 270"/>
+          <path id="p-srr" d="M 180 175 L 400 64 L 620 175" fill="none" opacity="0"/>
+          <path id="p-rrs" d="M 620 175 L 400 64 L 180 175" fill="none" opacity="0"/>
 
-          <!-- Soft red halo for premium-feel chunk packets -->
           <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur stdDeviation="2.4" result="blur"/>
+            <feGaussianBlur stdDeviation="2.6" result="blur"/>
             <feMerge>
               <feMergeNode in="blur"/>
               <feMergeNode in="SourceGraphic"/>
             </feMerge>
           </filter>
 
-          <!-- Grid pattern backdrop -->
           <pattern id="anim-grid" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#0d0d0c" stroke-width="0.3" opacity="0.06"/>
+            <path d="M 20 0 L 0 0 0 20" fill="none" stroke="#ECE6DC" stroke-width="0.3" opacity="0.04"/>
           </pattern>
         </defs>
 
-        <!-- subtle grid backdrop -->
         <rect x="0" y="0" width="800" height="320" fill="url(#anim-grid)"/>
 
         <!-- signaling lines (dotted, with /ws/ label) -->
@@ -89,17 +87,16 @@
         <!-- relay -->
         <g class="node relay-node">
           <rect x="340" y="30" width="120" height="68">
-            <!-- arrival pulse: stroke flashes red briefly when each signaling packet arrives -->
             <animate attributeName="stroke" dur="10s" repeatCount="indefinite" calcMode="discrete"
-              values="#0d0d0c;#e5231b;#0d0d0c;#e5231b;#0d0d0c;#e5231b;#0d0d0c;#e5231b;#0d0d0c"
+              values="#ECE6DC;#FF4F00;#ECE6DC;#FF4F00;#ECE6DC;#FF4F00;#ECE6DC;#FF4F00;#ECE6DC"
               keyTimes="0;0.13;0.15;0.21;0.23;0.34;0.36;0.42;0.44"/>
           </rect>
-          <rect x="350" y="38" width="100" height="10" fill="none" stroke="#0d0d0c" stroke-width="0.8"/>
-          <rect x="350" y="50" width="100" height="10" fill="none" stroke="#0d0d0c" stroke-width="0.8"/>
-          <rect x="350" y="62" width="100" height="10" fill="none" stroke="#0d0d0c" stroke-width="0.8"/>
-          <circle cx="356" cy="43" r="1.4" fill="#e5231b"><animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite"/></circle>
-          <circle cx="356" cy="55" r="1.4" fill="#e5231b"><animate attributeName="opacity" values="1;0.3;1" dur="1.6s" begin="0.4s" repeatCount="indefinite"/></circle>
-          <circle cx="356" cy="67" r="1.4" fill="#e5231b"><animate attributeName="opacity" values="1;0.3;1" dur="1.6s" begin="0.8s" repeatCount="indefinite"/></circle>
+          <rect x="350" y="38" width="100" height="10" fill="none" stroke="#ECE6DC" stroke-width="0.6" opacity="0.45"/>
+          <rect x="350" y="50" width="100" height="10" fill="none" stroke="#ECE6DC" stroke-width="0.6" opacity="0.45"/>
+          <rect x="350" y="62" width="100" height="10" fill="none" stroke="#ECE6DC" stroke-width="0.6" opacity="0.45"/>
+          <circle cx="356" cy="43" r="1.4" fill="#FF4F00"><animate attributeName="opacity" values="1;0.3;1" dur="1.6s" repeatCount="indefinite"/></circle>
+          <circle cx="356" cy="55" r="1.4" fill="#FF4F00"><animate attributeName="opacity" values="1;0.3;1" dur="1.6s" begin="0.4s" repeatCount="indefinite"/></circle>
+          <circle cx="356" cy="67" r="1.4" fill="#FF4F00"><animate attributeName="opacity" values="1;0.3;1" dur="1.6s" begin="0.8s" repeatCount="indefinite"/></circle>
           <text x="400" y="90" text-anchor="middle" class="node-label">RELAY</text>
         </g>
 
@@ -107,31 +104,29 @@
         <g class="node sender-node">
           <rect x="40" y="156" width="140" height="96"/>
 
-          <!-- Browser variant: 0–50% with smooth cross-fade -->
           <g class="icon-browser">
             <animate attributeName="opacity" dur="10s" repeatCount="indefinite" values="1;1;0;0;1" keyTimes="0;0.46;0.54;0.96;1"/>
-            <rect x="76" y="166" width="68" height="42" fill="none" stroke="#0d0d0c" stroke-width="1.4"/>
-            <line x1="76" y1="176" x2="144" y2="176" stroke="#0d0d0c" stroke-width="1"/>
-            <circle cx="81" cy="171" r="1.5" fill="#0d0d0c"/>
-            <circle cx="87" cy="171" r="1.5" fill="#0d0d0c"/>
-            <circle cx="93" cy="171" r="1.5" fill="#0d0d0c"/>
-            <line x1="82" y1="184" x2="138" y2="184" stroke="#b3b3ae" stroke-width="1"/>
-            <line x1="82" y1="190" x2="120" y2="190" stroke="#b3b3ae" stroke-width="1"/>
-            <line x1="82" y1="196" x2="130" y2="196" stroke="#b3b3ae" stroke-width="1"/>
-            <line x1="82" y1="202" x2="110" y2="202" stroke="#b3b3ae" stroke-width="1"/>
+            <rect x="76" y="166" width="68" height="42" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
+            <line x1="76" y1="176" x2="144" y2="176" stroke="#ECE6DC" stroke-width="0.8"/>
+            <circle cx="81" cy="171" r="1.4" fill="#ECE6DC"/>
+            <circle cx="87" cy="171" r="1.4" fill="#ECE6DC"/>
+            <circle cx="93" cy="171" r="1.4" fill="#ECE6DC"/>
+            <line x1="82" y1="184" x2="138" y2="184" stroke="#5A534A" stroke-width="1"/>
+            <line x1="82" y1="190" x2="120" y2="190" stroke="#5A534A" stroke-width="1"/>
+            <line x1="82" y1="196" x2="130" y2="196" stroke="#5A534A" stroke-width="1"/>
+            <line x1="82" y1="202" x2="110" y2="202" stroke="#5A534A" stroke-width="1"/>
           </g>
 
-          <!-- CLI variant: 50–100% with smooth cross-fade -->
           <g class="icon-cli" opacity="0">
             <animate attributeName="opacity" dur="10s" repeatCount="indefinite" values="0;0;1;1;0" keyTimes="0;0.46;0.54;0.96;1"/>
-            <rect x="76" y="166" width="68" height="42" fill="none" stroke="#0d0d0c" stroke-width="1.4"/>
-            <line x1="76" y1="174" x2="144" y2="174" stroke="#0d0d0c" stroke-width="1"/>
-            <circle cx="81" cy="170" r="1.4" fill="#0d0d0c"/>
-            <circle cx="87" cy="170" r="1.4" fill="#0d0d0c"/>
-            <circle cx="93" cy="170" r="1.4" fill="#0d0d0c"/>
-            <text x="80" y="190" font-family="IBM Plex Mono, monospace" font-size="8" fill="#0d0d0c" font-weight="600">$ airpipe</text>
-            <text x="80" y="200" font-family="IBM Plex Mono, monospace" font-size="8" fill="#0d0d0c">  send file</text>
-            <rect x="118" y="194" width="6" height="7" fill="#e5231b">
+            <rect x="76" y="166" width="68" height="42" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
+            <line x1="76" y1="174" x2="144" y2="174" stroke="#ECE6DC" stroke-width="0.8"/>
+            <circle cx="81" cy="170" r="1.3" fill="#ECE6DC"/>
+            <circle cx="87" cy="170" r="1.3" fill="#ECE6DC"/>
+            <circle cx="93" cy="170" r="1.3" fill="#ECE6DC"/>
+            <text x="80" y="190" font-family="JetBrains Mono, monospace" font-size="8" fill="#ECE6DC" font-weight="600">$ airpipe</text>
+            <text x="80" y="200" font-family="JetBrains Mono, monospace" font-size="8" fill="#ECE6DC">  send file</text>
+            <rect x="118" y="194" width="6" height="7" fill="#FF4F00">
               <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
             </rect>
           </g>
@@ -149,31 +144,29 @@
         <g class="node receiver-node">
           <rect x="620" y="156" width="140" height="96"/>
 
-          <!-- Browser variant: 0–25% & 75–100% with cross-fade -->
           <g class="icon-browser">
             <animate attributeName="opacity" dur="10s" repeatCount="indefinite" values="1;1;0;0;1;1" keyTimes="0;0.21;0.29;0.71;0.79;1"/>
-            <rect x="656" y="166" width="68" height="42" fill="none" stroke="#0d0d0c" stroke-width="1.4"/>
-            <line x1="656" y1="176" x2="724" y2="176" stroke="#0d0d0c" stroke-width="1"/>
-            <circle cx="661" cy="171" r="1.5" fill="#0d0d0c"/>
-            <circle cx="667" cy="171" r="1.5" fill="#0d0d0c"/>
-            <circle cx="673" cy="171" r="1.5" fill="#0d0d0c"/>
-            <line x1="662" y1="184" x2="718" y2="184" stroke="#b3b3ae" stroke-width="1"/>
-            <line x1="662" y1="190" x2="700" y2="190" stroke="#b3b3ae" stroke-width="1"/>
-            <line x1="662" y1="196" x2="710" y2="196" stroke="#b3b3ae" stroke-width="1"/>
-            <line x1="662" y1="202" x2="690" y2="202" stroke="#b3b3ae" stroke-width="1"/>
+            <rect x="656" y="166" width="68" height="42" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
+            <line x1="656" y1="176" x2="724" y2="176" stroke="#ECE6DC" stroke-width="0.8"/>
+            <circle cx="661" cy="171" r="1.4" fill="#ECE6DC"/>
+            <circle cx="667" cy="171" r="1.4" fill="#ECE6DC"/>
+            <circle cx="673" cy="171" r="1.4" fill="#ECE6DC"/>
+            <line x1="662" y1="184" x2="718" y2="184" stroke="#5A534A" stroke-width="1"/>
+            <line x1="662" y1="190" x2="700" y2="190" stroke="#5A534A" stroke-width="1"/>
+            <line x1="662" y1="196" x2="710" y2="196" stroke="#5A534A" stroke-width="1"/>
+            <line x1="662" y1="202" x2="690" y2="202" stroke="#5A534A" stroke-width="1"/>
           </g>
 
-          <!-- CLI variant: 25–75% with cross-fade -->
           <g class="icon-cli" opacity="0">
             <animate attributeName="opacity" dur="10s" repeatCount="indefinite" values="0;0;1;1;0;0" keyTimes="0;0.21;0.29;0.71;0.79;1"/>
-            <rect x="656" y="166" width="68" height="42" fill="none" stroke="#0d0d0c" stroke-width="1.4"/>
-            <line x1="656" y1="174" x2="724" y2="174" stroke="#0d0d0c" stroke-width="1"/>
-            <circle cx="661" cy="170" r="1.4" fill="#0d0d0c"/>
-            <circle cx="667" cy="170" r="1.4" fill="#0d0d0c"/>
-            <circle cx="673" cy="170" r="1.4" fill="#0d0d0c"/>
-            <text x="660" y="190" font-family="IBM Plex Mono, monospace" font-size="8" fill="#0d0d0c" font-weight="600">$ airpipe</text>
-            <text x="660" y="200" font-family="IBM Plex Mono, monospace" font-size="8" fill="#0d0d0c">  receive .</text>
-            <rect x="710" y="194" width="6" height="7" fill="#e5231b">
+            <rect x="656" y="166" width="68" height="42" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
+            <line x1="656" y1="174" x2="724" y2="174" stroke="#ECE6DC" stroke-width="0.8"/>
+            <circle cx="661" cy="170" r="1.3" fill="#ECE6DC"/>
+            <circle cx="667" cy="170" r="1.3" fill="#ECE6DC"/>
+            <circle cx="673" cy="170" r="1.3" fill="#ECE6DC"/>
+            <text x="660" y="190" font-family="JetBrains Mono, monospace" font-size="8" fill="#ECE6DC" font-weight="600">$ airpipe</text>
+            <text x="660" y="200" font-family="JetBrains Mono, monospace" font-size="8" fill="#ECE6DC">  receive .</text>
+            <rect x="710" y="194" width="6" height="7" fill="#FF4F00">
               <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite"/>
             </rect>
           </g>
@@ -187,16 +180,10 @@
           </text>
         </g>
 
-        <!-- packets: 10s cycle (SDP offer/answer, ICE, direct chunks) -->
-
-        <!-- compound paths used by labeled pills with relay dwell -->
-        <path id="p-srr" d="M 180 175 L 400 64 L 620 175" fill="none" opacity="0"/>
-        <path id="p-rrs" d="M 620 175 L 400 64 L 180 175" fill="none" opacity="0"/>
-
         <!-- SDP offer pill -->
         <g opacity="0">
-          <rect x="-26" y="-10" width="52" height="20" rx="2" fill="#e5231b"/>
-          <text x="0" y="4" text-anchor="middle" fill="#fafaf7" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="700" letter-spacing="1">SDP →</text>
+          <rect x="-26" y="-10" width="52" height="20" rx="3" fill="#FF4F00"/>
+          <text x="0" y="4" text-anchor="middle" fill="#1B1714" font-family="JetBrains Mono, monospace" font-size="9" font-weight="700" letter-spacing="1">SDP →</text>
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;0.5;0.5;1;1"
             keyTimes="0;0.05;0.12;0.14;0.21;1"
@@ -210,8 +197,8 @@
 
         <!-- SDP answer pill -->
         <g opacity="0">
-          <rect x="-26" y="-10" width="52" height="20" rx="2" fill="#e5231b"/>
-          <text x="0" y="4" text-anchor="middle" fill="#fafaf7" font-family="IBM Plex Mono, monospace" font-size="9" font-weight="700" letter-spacing="1">← ACK</text>
+          <rect x="-26" y="-10" width="52" height="20" rx="3" fill="#FF4F00"/>
+          <text x="0" y="4" text-anchor="middle" fill="#1B1714" font-family="JetBrains Mono, monospace" font-size="9" font-weight="700" letter-spacing="1">← ACK</text>
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;0.5;0.5;1;1"
             keyTimes="0;0.23;0.30;0.32;0.39;1"
@@ -224,7 +211,7 @@
         </g>
 
         <!-- ICE candidates -->
-        <circle r="3.5" fill="#e5231b" opacity="0">
+        <circle r="3.5" fill="#FF4F00" opacity="0">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.41;0.45;1" keySplines="0 0 1 1; 0.4 0 0.4 1; 0 0 1 1">
             <mpath href="#p-srr"/>
@@ -232,7 +219,7 @@
           <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
             values="0;0;1;1;0;0" keyTimes="0;0.40;0.41;0.45;0.46;1"/>
         </circle>
-        <circle r="3.5" fill="#e5231b" opacity="0">
+        <circle r="3.5" fill="#FF4F00" opacity="0">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.43;0.47;1" keySplines="0 0 1 1; 0.4 0 0.4 1; 0 0 1 1">
             <mpath href="#p-rrs"/>
@@ -240,7 +227,7 @@
           <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
             values="0;0;1;1;0;0" keyTimes="0;0.42;0.43;0.47;0.48;1"/>
         </circle>
-        <circle r="3.5" fill="#e5231b" opacity="0">
+        <circle r="3.5" fill="#FF4F00" opacity="0">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.45;0.49;1" keySplines="0 0 1 1; 0.4 0 0.4 1; 0 0 1 1">
             <mpath href="#p-srr"/>
@@ -250,7 +237,7 @@
         </circle>
 
         <!-- direct chunks -->
-        <circle r="6" fill="#e5231b" opacity="0" filter="url(#glow)">
+        <circle r="6" fill="#FF4F00" opacity="0" filter="url(#glow)">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.55;0.66;1" keySplines="0 0 1 1; 0.45 0 0.55 1; 0 0 1 1">
             <mpath href="#p-direct"/>
@@ -258,7 +245,7 @@
           <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
             values="0;0;1;1;0;0" keyTimes="0;0.54;0.55;0.66;0.67;1"/>
         </circle>
-        <circle r="6" fill="#e5231b" opacity="0" filter="url(#glow)">
+        <circle r="6" fill="#FF4F00" opacity="0" filter="url(#glow)">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.61;0.72;1" keySplines="0 0 1 1; 0.45 0 0.55 1; 0 0 1 1">
             <mpath href="#p-direct"/>
@@ -266,7 +253,7 @@
           <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
             values="0;0;1;1;0;0" keyTimes="0;0.60;0.61;0.72;0.73;1"/>
         </circle>
-        <circle r="6" fill="#e5231b" opacity="0" filter="url(#glow)">
+        <circle r="6" fill="#FF4F00" opacity="0" filter="url(#glow)">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.67;0.78;1" keySplines="0 0 1 1; 0.45 0 0.55 1; 0 0 1 1">
             <mpath href="#p-direct"/>
@@ -274,7 +261,7 @@
           <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
             values="0;0;1;1;0;0" keyTimes="0;0.66;0.67;0.78;0.79;1"/>
         </circle>
-        <circle r="6" fill="#e5231b" opacity="0" filter="url(#glow)">
+        <circle r="6" fill="#FF4F00" opacity="0" filter="url(#glow)">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.73;0.84;1" keySplines="0 0 1 1; 0.45 0 0.55 1; 0 0 1 1">
             <mpath href="#p-direct"/>
@@ -282,7 +269,7 @@
           <animate attributeName="opacity" dur="10s" repeatCount="indefinite"
             values="0;0;1;1;0;0" keyTimes="0;0.72;0.73;0.84;0.85;1"/>
         </circle>
-        <circle r="6" fill="#e5231b" opacity="0" filter="url(#glow)">
+        <circle r="6" fill="#FF4F00" opacity="0" filter="url(#glow)">
           <animateMotion dur="10s" repeatCount="indefinite" calcMode="spline"
             keyPoints="0;0;1;1" keyTimes="0;0.79;0.90;1" keySplines="0 0 1 1; 0.45 0 0.55 1; 0 0 1 1">
             <mpath href="#p-direct"/>
@@ -304,8 +291,8 @@
         </text>
 
         <!-- Cycle progress bar at the bottom of the SVG -->
-        <rect x="0" y="316" width="800" height="3" fill="#0d0d0c" opacity="0.06"/>
-        <rect x="0" y="316" width="0" height="3" fill="#e5231b">
+        <rect x="0" y="316" width="800" height="3" fill="#ECE6DC" opacity="0.06"/>
+        <rect x="0" y="316" width="0" height="3" fill="#FF4F00">
           <animate attributeName="width" dur="10s" repeatCount="indefinite"
             values="0;800;0" keyTimes="0;0.99;1"/>
         </rect>
@@ -411,7 +398,7 @@
         </div>
       </div>
       <dl class="host-env">
-        <dt>AIRPIPE_ALLOWED_ORIGINS</dt><dd>CORS allowlist · CSV or `*`</dd>
+        <dt>AIRPIPE_ALLOWED_ORIGINS</dt><dd>CORS allowlist · CSV or *</dd>
         <dt>AIRPIPE_RATE_LIMIT_PER_MIN</dt><dd>Per-IP token bucket · default 60</dd>
         <dt>AIRPIPE_LOG_FORMAT</dt><dd>json · text</dd>
         <dt>PORT</dt><dd>default 8080</dd>

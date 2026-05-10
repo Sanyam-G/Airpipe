@@ -26,9 +26,9 @@ import (
 
 const defaultRelay = "https://airpipe.sanyamgarg.com"
 
-// ANSI escape codes
+// ANSI escape codes — orange brand (truecolor #FF4F00) matches landing/web aesthetic
 const (
-	colorCyan  = "\033[36m"
+	colorBrand  = "\033[38;2;255;79;0m"
 	colorGreen = "\033[32m"
 	colorRed   = "\033[31m"
 	colorDim   = "\033[2m"
@@ -37,11 +37,11 @@ const (
 )
 
 func banner(mode string) {
-	fmt.Fprintf(os.Stderr, "\n  %s%s    _   _     %s___  _          %s\n", colorBold, colorCyan, colorReset, colorReset)
-	fmt.Fprintf(os.Stderr, "  %s%s   /_\\ (_)_ _|%s _ \\(_)_ __  ___  %s\n", colorBold, colorCyan, colorReset, colorReset)
-	fmt.Fprintf(os.Stderr, "  %s%s  / _ \\| | '_|%s  _/| | '_ \\/ -_) %s\n", colorBold, colorCyan, colorReset, colorReset)
-	fmt.Fprintf(os.Stderr, "  %s%s /_/ \\_\\_|_| |%s_|  |_| .__/\\___| %s\n", colorBold, colorCyan, colorReset, colorReset)
-	fmt.Fprintf(os.Stderr, "  %s%s             %s      |_|    %s%s%s\n\n", colorBold, colorCyan, colorReset, colorDim, mode, colorReset)
+	fmt.Fprintf(os.Stderr, "\n  %s%s    _   _     %s___  _          %s\n", colorBold, colorBrand, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s   /_\\ (_)_ _|%s _ \\(_)_ __  ___  %s\n", colorBold, colorBrand, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s  / _ \\| | '_|%s  _/| | '_ \\/ -_) %s\n", colorBold, colorBrand, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s /_/ \\_\\_|_| |%s_|  |_| .__/\\___| %s\n", colorBold, colorBrand, colorReset, colorReset)
+	fmt.Fprintf(os.Stderr, "  %s%s             %s      |_|    %s%s%s\n\n", colorBold, colorBrand, colorReset, colorDim, mode, colorReset)
 }
 
 func main() {
@@ -162,9 +162,9 @@ func cmdSend(relay string, files []string) error {
 	}
 
 	// Display passphrase prominently
-	fmt.Printf("  %s%s╔══════════════════════════════════════════╗%s\n", colorBold, colorCyan, colorReset)
-	fmt.Printf("  %s%s║  %-40s║%s\n", colorBold, colorCyan, phrase, colorReset)
-	fmt.Printf("  %s%s╚══════════════════════════════════════════╝%s\n\n", colorBold, colorCyan, colorReset)
+	fmt.Printf("  %s%s╔══════════════════════════════════════════╗%s\n", colorBold, colorBrand, colorReset)
+	fmt.Printf("  %s%s║  %-40s║%s\n", colorBold, colorBrand, phrase, colorReset)
+	fmt.Printf("  %s%s╚══════════════════════════════════════════╝%s\n\n", colorBold, colorBrand, colorReset)
 	fmt.Printf("  Tell them: %s%s%s\n", colorBold, httpRelay, colorReset)
 	fmt.Printf("  They type the code, they get the file.\n\n")
 
@@ -188,7 +188,7 @@ func cmdReceive(relay, destDir string) error {
 	banner("receive")
 	fmt.Printf("  Destination: %s%s%s\n\n", colorBold, destDir, colorReset)
 	qr.GenerateTerminal(url)
-	fmt.Printf("\n  %s%s%s\n\n  %sWaiting for sender...%s\n\n", colorCyan, url, colorReset, colorDim, colorReset)
+	fmt.Printf("\n  %s%s%s\n\n  %sWaiting for sender...%s\n\n", colorBrand, url, colorReset, colorDim, colorReset)
 
 	receiver := transfer.NewReceiver(wsRelay, token, key)
 	if err := receiver.Connect(); err != nil {
@@ -224,7 +224,7 @@ func cmdDownload(relay string, args []string) error {
 	derivedKey := passphrase.DeriveKey(phrase)
 
 	banner("download")
-	fmt.Printf("  Passphrase: %s%s%s\n", colorCyan, passphrase.Normalize(phrase), colorReset)
+	fmt.Printf("  Passphrase: %s%s%s\n", colorBrand, passphrase.Normalize(phrase), colorReset)
 	fmt.Printf("  Destination: %s%s%s\n\n", colorBold, destDir, colorReset)
 	fmt.Print("  Fetching...")
 
@@ -479,6 +479,6 @@ func progress(sent, total int64) {
 	if filled > 40 {
 		filled = 40
 	}
-	bar := colorCyan + strings.Repeat("█", filled) + colorReset + strings.Repeat("░", 40-filled)
+	bar := colorBrand + strings.Repeat("█", filled) + colorReset + strings.Repeat("░", 40-filled)
 	fmt.Fprintf(os.Stderr, "\r  [%s] %3.0f%% %s%s/%s%s", bar, pct, colorDim, fmtBytes(sent), fmtBytes(total), colorReset)
 }

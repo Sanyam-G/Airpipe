@@ -7,8 +7,8 @@
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;500;600;700&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20260423">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css?v=20260510a">
 </head>
 <body>
 
@@ -233,7 +233,7 @@ async function handleFile(file){
       document.getElementById('phrase-domain').textContent=location.host;
       document.getElementById('share-url').textContent=shareURL;
 
-      // Generate QR (red on cream to match aesthetic)
+      // Generate QR (cream bg + warm-dark modules — kept light for camera scan reliability)
       const qr=qrcode(0,'M');
       qr.addData(shareURL);
       qr.make();
@@ -243,8 +243,8 @@ async function handleFile(file){
       const size=modules*cellSize;
       canvas.width=size;canvas.height=size;
       const ctx=canvas.getContext('2d');
-      ctx.fillStyle='#f5f2eb';ctx.fillRect(0,0,size,size);
-      ctx.fillStyle='#0a0a0a';
+      ctx.fillStyle='#ECE6DC';ctx.fillRect(0,0,size,size);
+      ctx.fillStyle='#1B1714';
       for(let r=0;r<modules;r++){
         for(let c=0;c<modules;c++){
           if(qr.isDark(r,c)) ctx.fillRect(c*cellSize,r*cellSize,cellSize,cellSize);
