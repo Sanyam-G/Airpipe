@@ -65,7 +65,7 @@
     <div class="transport" id="done-transport"></div>
     <div class="filename" id="fname">-</div>
     <div class="size-info" id="file-size">-</div>
-    <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked it. Reload to try again.</p>
+    <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked it. Keep this tab open to receive more files from the same sender.</p>
   </section>
 
   <section id="error" class="block hidden">
@@ -316,6 +316,7 @@ function runLive() {
       return;
     }
     if (msg.type === MSG_P2P_FAIL) {
+      resetLiveTransfer();
       transport = 'ws';
       if (pc) { try { pc.close() } catch (_) { } pc = null; dc = null }
       phase = 'receiving';
@@ -334,7 +335,26 @@ function runLive() {
   };
 }
 
+function closePeer() {
+  if (dc) { try { dc.close() } catch (_) { } dc = null }
+  if (pc) { try { pc.close() } catch (_) { } pc = null }
+}
+
+function resetLiveTransfer() {
+  metadata = null;
+  bytesReceived = 0;
+  receivedChunks = [];
+  startTime = performance.now();
+  lastUIUpdate = 0;
+  transport = null;
+  $('live-progress').style.width = '0%';
+  $('live-ptext').textContent = '0%';
+  $('speed').textContent = '';
+}
+
 async function answerOffer(offerSDP) {
+  closePeer();
+  resetLiveTransfer();
   pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   dc = pc.createDataChannel('airpipe', { ordered: true, id: 1, negotiated: true });
   dc.binaryType = 'arraybuffer';
@@ -423,7 +443,6 @@ function finishTransfer() {
     return;
   }
   const blob = new Blob(receivedChunks);
-  receivedChunks = [];
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = metadata.filename;
@@ -435,7 +454,8 @@ function finishTransfer() {
   $('done-transport').textContent = transport === 'p2p' ? 'direct · WebRTC' : 'via relay';
   show('complete');
 
-  try { ws.close() } catch (_) { }
+  closePeer();
+  resetLiveTransfer();
 }
 
 </script>

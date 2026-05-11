@@ -30,7 +30,7 @@ const defaultRelay = "https://airpipe.sanyamgarg.com"
 
 // ANSI escape codes
 const (
-	colorBrand  = "\033[38;2;255;79;0m"
+	colorBrand = "\033[38;2;255;79;0m"
 	colorGreen = "\033[32m"
 	colorRed   = "\033[31m"
 	colorDim   = "\033[2m"
@@ -273,12 +273,24 @@ func cmdReceive(relay, destDir string) error {
 	}
 	defer receiver.Close()
 
-	savedPath, err := receiver.ReceiveFile(destDir, progress)
-	if err != nil {
-		return err
+	return receiveLiveSession(receiver, destDir)
+}
+
+func receiveLiveSession(receiver *transfer.Receiver, destDir string) error {
+	received := 0
+	for {
+		savedPath, err := receiver.ReceiveFileWithTimeout(destDir, progress, 10*time.Minute)
+		if err != nil {
+			if received > 0 && strings.Contains(err.Error(), "read first message:") {
+				fmt.Printf("\n  %sSession ended%s\n\n", colorDim, colorReset)
+				return nil
+			}
+			return err
+		}
+		received++
+		fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
+		fmt.Printf("  %sWaiting for another file with the same code... Ctrl+C to stop.%s\n\n", colorDim, colorReset)
 	}
-	fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
-	return nil
 }
 
 func cmdDownload(relay string, args []string) error {
@@ -322,11 +334,9 @@ func cmdDownload(relay string, args []string) error {
 		}
 		defer receiver.Close()
 
-		savedPath, err := receiver.ReceiveFile(destDir, progress)
-		if err != nil {
+		if err := receiveLiveSession(receiver, destDir); err != nil {
 			return fmt.Errorf("p2p receive: %w", err)
 		}
-		fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {

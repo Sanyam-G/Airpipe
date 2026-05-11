@@ -57,7 +57,7 @@
     <div class="transport" id="done-transport"></div>
     <div class="filename" id="done-name">-</div>
     <div class="size-info" id="done-size"></div>
-    <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked it.</p>
+    <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked it. Keep this tab open to receive more files from the same sender.</p>
   </section>
 
   <section id="error" class="block hidden">
@@ -223,6 +223,7 @@ ws.onmessage=async(evt)=>{
   }
   if(msg.type===MSG_P2P_FAIL){
     // sender gave up on webrtc and is streaming over ws
+    resetIncomingTransfer();
     transport='ws';
     if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
     phase='receiving';
@@ -243,7 +244,26 @@ ws.onmessage=async(evt)=>{
   }
 };
 
+function closePeer(){
+  if(dc){try{dc.close()}catch(_){}dc=null}
+  if(pc){try{pc.close()}catch(_){}pc=null}
+}
+
+function resetIncomingTransfer(){
+  metadata=null;
+  bytesReceived=0;
+  chunks=[];
+  startTime=performance.now();
+  lastUIUpdate=0;
+  transport=null;
+  $('progress').style.width='0%';
+  $('ptext').textContent='0%';
+  $('speed').textContent='';
+}
+
 async function answerOffer(offerSDP){
+  closePeer();
+  resetIncomingTransfer();
   pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
   dc=pc.createDataChannel('airpipe',{ordered:true,id:1,negotiated:true});
   dc.binaryType='arraybuffer';
@@ -331,8 +351,10 @@ function finishTransfer(){
     showError('Transfer ended without metadata');
     return;
   }
+  const filename=metadata.filename;
+  const size=metadata.size;
+  const completedTransport=transport;
   const blob=new Blob(chunks);
-  chunks=[]; // free
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
   a.download=metadata.filename;
@@ -344,8 +366,8 @@ function finishTransfer(){
   $('done-transport').textContent=transport==='p2p'?'direct · WebRTC':'via relay';
   show('complete');
 
-  // let sender know we're done via WS close
-  try{ws.close()}catch(_){ }
+  closePeer();
+  resetIncomingTransfer();
 }
 
 </script>

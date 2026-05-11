@@ -121,7 +121,7 @@ func TestRoomCleanup(t *testing.T) {
 	rm.rooms["old"] = &Room{
 		token:     "old",
 		clients:   nil,
-		createdAt: time.Now().Add(-15 * time.Minute),
+		createdAt: time.Now().Add(-roomExpiry - time.Minute),
 	}
 	rm.rooms["new"] = &Room{
 		token:     "new",
@@ -131,7 +131,7 @@ func TestRoomCleanup(t *testing.T) {
 
 	rm.mu.Lock()
 	for token, room := range rm.rooms {
-		if time.Since(room.createdAt) > 10*time.Minute {
+		if time.Since(room.createdAt) > roomExpiry {
 			delete(rm.rooms, token)
 		}
 	}

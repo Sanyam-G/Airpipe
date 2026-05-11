@@ -69,6 +69,8 @@
     <div class="transport" id="done-transport"></div>
     <div class="filename" id="done-name">-</div>
     <div class="size-info" id="done-size"></div>
+    <p class="block-sub">Keep this tab open to send more files to the same receiver.</p>
+    <button class="cta cta-primary" id="send-another">Send another file <span class="arrow">→</span></button>
   </section>
 
   <section id="error" class="block hidden">
@@ -143,6 +145,8 @@ function awaitMsg(type,timeoutMs){
 
 let pc=null,dc=null;
 let phase='connecting';
+let readyForTransfers=false;
+let readyPromise=null;
 
 ws.onmessage=async(evt)=>{
   const enc=new Uint8Array(evt.data);
@@ -194,6 +198,7 @@ const dropzone=$('dropzone');
 const fileinput=$('fileinput');
 dropzone.addEventListener('click',()=>fileinput.click());
 fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFile(e.target.files[0])});
+$('send-another').addEventListener('click',resetSenderForNextFile);
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop',(e)=>{
@@ -202,7 +207,39 @@ dropzone.addEventListener('drop',(e)=>{
   if(e.dataTransfer.files.length)sendFile(e.dataTransfer.files[0]);
 });
 
+function closePeer(){
+  if(dc){try{dc.close()}catch(_){}dc=null}
+  if(pc){try{pc.close()}catch(_){}pc=null}
+}
+
+function startReceiverHandshake(){
+  if(readyPromise)return readyPromise;
+  readyPromise=(async()=>{
+    ws.send(encrypt(encode(MSG_VERSION,new Uint8Array([PROTOCOL_VERSION])),keyBytes));
+    await awaitMsg(MSG_READY,30000);
+    readyForTransfers=true;
+    phase='select';
+    show('select');
+  })().catch(err=>{
+    readyPromise=null;
+    throw err;
+  });
+  return readyPromise;
+}
+
+function resetSenderForNextFile(){
+  closePeer();
+  fileinput.value='';
+  $('progress').style.width='0%';
+  $('ptext').textContent='0%';
+  $('speed').textContent='';
+  $('transport').textContent='';
+  phase='select';
+  show('select');
+}
+
 async function sendFile(file){
+  if(phase==='preparing'||phase==='negotiating'||phase==='sending')return;
   $('filename').textContent=file.name;
   $('send-size').textContent=formatSize(file.size);
   $('prep-name').textContent=file.name;
@@ -212,8 +249,9 @@ async function sendFile(file){
     phase='preparing';
     show('preparing');
 
-    ws.send(encrypt(encode(MSG_VERSION,new Uint8Array([PROTOCOL_VERSION])),keyBytes));
-    await awaitMsg(MSG_READY,30000);
+    if(!readyForTransfers){
+      await startReceiverHandshake();
+    }
 
     phase='negotiating';
     show('negotiating');
@@ -250,6 +288,7 @@ async function sendFile(file){
 }
 
 async function negotiateP2P(){
+  closePeer();
   pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
   dc=pc.createDataChannel('airpipe',{ordered:true,id:1,negotiated:true});
   dc.binaryType='arraybuffer';

@@ -74,7 +74,8 @@
     <div class="transport" id="done-transport"></div>
     <div class="filename" id="done-name">-</div>
     <div class="size-info" id="done-size"></div>
-    <p class="block-sub">Reload to send another file.</p>
+    <p class="block-sub">Keep this passphrase open to send more files to the same receiver.</p>
+    <button class="cta cta-primary" id="send-another">Send another file <span class="arrow">→</span></button>
   </section>
 
   <section id="error" class="block hidden">
@@ -306,6 +307,7 @@ const dropzone=$('dropzone');
 const fileinput=$('fileinput');
 dropzone.addEventListener('click',()=>fileinput.click());
 fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFile(e.target.files[0])});
+$('send-another').addEventListener('click',resetSenderForNextFile);
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop',(e)=>{
@@ -314,7 +316,29 @@ dropzone.addEventListener('drop',(e)=>{
   if(e.dataTransfer.files.length)sendFile(e.dataTransfer.files[0]);
 });
 
+function closePeer(){
+  if(dc){try{dc.close()}catch(_){}dc=null}
+  if(pc){try{pc.close()}catch(_){}pc=null}
+}
+
+function resetSenderForNextFile(){
+  closePeer();
+  fileinput.value='';
+  $('progress').style.width='0%';
+  $('ptext').textContent='0%';
+  $('speed').textContent='';
+  $('transport').textContent='';
+  if(peerJoined){
+    phase='select';
+    show('select');
+  }else{
+    phase='waiting';
+    show('waiting');
+  }
+}
+
 async function sendFile(file){
+  if(phase==='sending'||phase==='negotiating')return;
   $('filename').textContent=file.name;
   $('send-size').textContent=formatSize(file.size);
   $('neg-name').textContent=file.name;
@@ -356,6 +380,7 @@ async function sendFile(file){
 }
 
 async function negotiateP2P(){
+  closePeer();
   pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
   dc=pc.createDataChannel('airpipe',{ordered:true,id:1,negotiated:true});
   dc.binaryType='arraybuffer';

@@ -116,6 +116,10 @@ func uniquePath(path string) string {
 }
 
 func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total int64)) (string, error) {
+	return r.ReceiveFileWithTimeout(destDir, progressFn, 30*time.Second)
+}
+
+func (r *Receiver) ReceiveFileWithTimeout(destDir string, progressFn func(received, total int64), firstMessageTimeout time.Duration) (string, error) {
 	info, err := os.Stat(destDir)
 	if err != nil {
 		return "", fmt.Errorf("destination directory %q does not exist: %w", destDir, err)
@@ -124,7 +128,11 @@ func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total i
 		return "", fmt.Errorf("destination path %q is not a directory", destDir)
 	}
 
-	r.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
+	if firstMessageTimeout > 0 {
+		r.conn.SetReadDeadline(time.Now().Add(firstMessageTimeout))
+	} else {
+		r.conn.SetReadDeadline(time.Time{})
+	}
 	first, err := readSignalMsg(r.conn, r.key)
 	if err != nil {
 		return "", fmt.Errorf("read first message: %w", err)

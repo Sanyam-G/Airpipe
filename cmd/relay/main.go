@@ -95,6 +95,7 @@ func newLogger(format string) *slog.Logger {
 const (
 	maxUploadSize = 500 << 20
 	fileExpiry    = 10 * time.Minute
+	roomExpiry    = 10 * time.Minute
 )
 
 var (
@@ -293,7 +294,7 @@ func (rm *RoomManager) cleanupLoop() {
 		case <-ticker.C:
 			rm.mu.Lock()
 			for token, room := range rm.rooms {
-				if time.Since(room.createdAt) > 10*time.Minute {
+				if time.Since(room.createdAt) > roomExpiry {
 					room.mu.Lock()
 					for _, conn := range room.clients {
 						conn.Close()
@@ -328,6 +329,7 @@ func (room *Room) AddClient(conn *websocket.Conn) bool {
 	if len(room.clients) >= 2 {
 		return false
 	}
+	room.createdAt = time.Now()
 	room.clients = append(room.clients, conn)
 	return true
 }
@@ -346,6 +348,7 @@ func (room *Room) RemoveClient(conn *websocket.Conn) {
 func (room *Room) Broadcast(sender *websocket.Conn, message []byte) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
+	room.createdAt = time.Now()
 	for _, conn := range room.clients {
 		if conn != sender {
 			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
