@@ -56,10 +56,14 @@ func main() {
 	args := flag.Args()
 
 	if len(args) < 1 {
-		fmt.Printf("Usage: %sairpipe%s send <file> [file2...]\n", colorBold, colorReset)
+		fmt.Printf("Usage: %sairpipe%s send [--mode p2p|mailbox] <file> [file2...]\n", colorBold, colorReset)
 		fmt.Printf("       %sairpipe%s receive [dir]\n", colorBold, colorReset)
 		fmt.Printf("       %sairpipe%s download <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
 		fmt.Printf("       %sairpipe%s update\n", colorBold, colorReset)
+		fmt.Printf("Arguments:\n")
+		fmt.Printf("       [--relay <origin>]\n")
+		fmt.Printf("           - Use before any other command to temporarily overwrite the relay hostname\n")
+		fmt.Printf("           - %sexport AIRPIPE_RELAY=<origin>%s to set it permenantly\n", colorBold, colorReset)
 		os.Exit(1)
 	}
 
