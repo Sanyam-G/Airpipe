@@ -38,6 +38,59 @@ const (
 	colorReset = "\033[0m"
 )
 
+func printUsage() {
+	fmt.Printf("Usage: %sairpipe%s send [--mode p2p|mailbox] <file> [file2...]\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s receive [dir]\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s download <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s update\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s help\n\n", colorBold, colorReset)
+	fmt.Printf("Run %sairpipe help%s for details.\n", colorBold, colorReset)
+}
+
+func printHelp() {
+	b := colorBold
+	r := colorReset
+	d := colorDim
+	fmt.Printf("\n%sairpipe%s — peer-to-peer encrypted file transfer\n\n", b, r)
+
+	fmt.Printf("%sCommands%s\n", b, r)
+	fmt.Printf("  %ssend%s [--mode p2p|mailbox] <file> [file2...]\n", b, r)
+	fmt.Printf("      Encrypt and share a file. You get a passphrase like %sRIVER FALCON MARBLE 42%s.\n", b, r)
+	fmt.Printf("      Multiple files or a folder are auto-zipped.\n")
+	fmt.Printf("        %s--mode p2p%s      Stream directly between sender and receiver over WebRTC.\n", b, r)
+	fmt.Printf("        %s--mode mailbox%s  Upload to the relay; receiver downloads later.\n", b, r)
+	fmt.Printf("                        10-minute expiry, 500 MB cap.\n")
+	fmt.Printf("        %s(default: prompt)%s\n\n", d, r)
+
+	fmt.Printf("  %sreceive%s [dir]\n", b, r)
+	fmt.Printf("      Wait for someone to send a file to you. Defaults to current directory.\n\n")
+
+	fmt.Printf("  %sdownload%s <WORD WORD WORD NN> [dir]\n", b, r)
+	fmt.Printf("      Download a file using a passphrase someone shared.\n\n")
+
+	fmt.Printf("  %supdate%s\n", b, r)
+	fmt.Printf("      Self-update the CLI binary in place.\n\n")
+
+	fmt.Printf("  %shelp%s\n", b, r)
+	fmt.Printf("      Show this message.\n\n")
+
+	fmt.Printf("%sFlags%s\n", b, r)
+	fmt.Printf("  %s--relay%s <origin>\n", b, r)
+	fmt.Printf("      Use a relay other than the default for this call.\n")
+	fmt.Printf("      Permanent: %sexport AIRPIPE_RELAY=https://your-relay.example%s\n\n", b, r)
+
+	fmt.Printf("%sExamples%s\n", b, r)
+	fmt.Printf("  airpipe send report.pdf\n")
+	fmt.Printf("  airpipe send photos/ docs/                  %s# zips everything%s\n", d, r)
+	fmt.Printf("  airpipe download RIVER FALCON MARBLE 42\n")
+	fmt.Printf("  airpipe receive ~/Downloads\n")
+	fmt.Printf("  airpipe --relay https://my.relay send a.zip\n\n")
+
+	fmt.Printf("%sLinks%s\n", b, r)
+	fmt.Printf("  Source        github.com/Sanyam-G/Airpipe\n")
+	fmt.Printf("  Web sender    https://airpipe.sanyamgarg.com\n\n")
+}
+
 func banner(mode string) {
 	fmt.Fprintf(os.Stderr, "\n  %s%s    _   _     %s___  _          %s\n", colorBold, colorBrand, colorReset, colorReset)
 	fmt.Fprintf(os.Stderr, "  %s%s   /_\\ (_)_ _|%s _ \\(_)_ __  ___  %s\n", colorBold, colorBrand, colorReset, colorReset)
@@ -56,14 +109,7 @@ func main() {
 	args := flag.Args()
 
 	if len(args) < 1 {
-		fmt.Printf("Usage: %sairpipe%s send [--mode p2p|mailbox] <file> [file2...]\n", colorBold, colorReset)
-		fmt.Printf("       %sairpipe%s receive [dir]\n", colorBold, colorReset)
-		fmt.Printf("       %sairpipe%s download <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
-		fmt.Printf("       %sairpipe%s update\n", colorBold, colorReset)
-		fmt.Printf("Arguments:\n")
-		fmt.Printf("       [--relay <origin>]\n")
-		fmt.Printf("           - Use before any other command to temporarily overwrite the relay hostname\n")
-		fmt.Printf("           - %sexport AIRPIPE_RELAY=<origin>%s to set it permenantly\n", colorBold, colorReset)
+		printUsage()
 		os.Exit(1)
 	}
 
@@ -89,8 +135,12 @@ func main() {
 		err = cmdDownload(*relay, args[1:])
 	case "update":
 		err = cmdUpdate()
+	case "help", "--help", "-h":
+		printHelp()
+		return
 	default:
-		fmt.Printf("Unknown command: %s\n", args[0])
+		fmt.Printf("Unknown command: %s\n\n", args[0])
+		printUsage()
 		os.Exit(1)
 	}
 

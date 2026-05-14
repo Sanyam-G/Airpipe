@@ -44,7 +44,14 @@ export AIRPIPE_RELAY=https://your-server.example
 airpipe send file.txt
 ```
 
-Env vars if you want to tune things: `PORT` (default `8080`), `AIRPIPE_ALLOWED_ORIGINS` (CORS - set to domain(s) you host from, default `"http://localhost:8080","http://127.0.0.1:8080"` (`*` for any origin)), `AIRPIPE_RATE_LIMIT_PER_MIN` (default `60`), `AIRPIPE_LOG_FORMAT` (`json` or `text`).
+Env vars if you want to tune things:
+
+| Var | Default | Notes |
+|---|---|---|
+| `PORT` | `8080` | |
+| `AIRPIPE_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated origins for CORS. Set to the domain(s) you host from. Use `*` to allow any. |
+| `AIRPIPE_RATE_LIMIT_PER_MIN` | `60` | |
+| `AIRPIPE_LOG_FORMAT` | `json` | Or `text`. |
 
 ## CLI
 
