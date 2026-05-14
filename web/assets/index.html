@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AirPipe — peer-to-peer encrypted file transfer</title>
+<meta name="description" content="Encrypted file transfer, peer-to-peer in the browser. Self-hostable.">
+<meta property="og:title" content="AirPipe">
+<meta property="og:description" content="Encrypted file transfer, peer-to-peer in the browser. Self-hostable.">
+<meta property="og:url" content="https://airpipe.sanyamgarg.com">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260510a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/landing.css?v=20260514e">
+</head>
+<body class="page-home">
+
+  <nav class="topnav">
+    <a class="nav-brand" href="/">
+      <span class="brand-mark">A</span>
+      <span>AirPipe</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="/development">Development</a>
+      <a class="nav-link nav-gh" id="nav-gh" href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span id="gh-stars" class="gh-stars">—</span>
+      </a>
+      <a class="nav-cta" href="/live">Send a file</a>
+    </div>
+  </nav>
+
+  <main class="home">
+
+    <section class="hero">
+      <div class="hero-copy">
+        <h1>Encrypted file transfer.<br><span class="accent">Peer-to-peer.</span></h1>
+        <p class="hero-sub">AirPipe sends files directly between your devices, encrypted in your browser. The relay never sees what you send.</p>
+        <div class="hero-cta">
+          <a class="btn-primary" href="/live">Send a file →</a>
+          <a class="btn-secondary" href="/send">10-min mailbox</a>
+        </div>
+        <p class="hero-meta">
+          <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
+          &nbsp;·&nbsp; v4.1.5 &nbsp;·&nbsp; MIT &nbsp;·&nbsp; <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a>
+        </p>
+      </div>
+      <div class="hero-demo">
+        <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The relay only sees encrypted signaling. The file goes directly between sender and receiver.">
+          <g>
+            <rect x="230" y="22" width="140" height="62" rx="10" fill="#221d19" stroke="#ECE6DC" stroke-opacity="0.4" stroke-width="1"/>
+            <text x="300" y="50" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ECE6DC">Relay</text>
+            <text x="300" y="68" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#847C71">encrypted signaling only</text>
+          </g>
+          <g>
+            <rect x="60" y="200" width="170" height="92" rx="10" fill="#221d19" stroke="#ECE6DC" stroke-opacity="0.4" stroke-width="1"/>
+            <text x="145" y="222" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">Sender</text>
+            <rect x="128" y="235" width="34" height="42" rx="2" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
+            <line x1="133" y1="247" x2="157" y2="247" stroke="#ECE6DC" stroke-opacity="0.5"/>
+            <line x1="133" y1="255" x2="155" y2="255" stroke="#ECE6DC" stroke-opacity="0.5"/>
+            <line x1="133" y1="263" x2="152" y2="263" stroke="#ECE6DC" stroke-opacity="0.5"/>
+          </g>
+          <g>
+            <rect x="370" y="200" width="170" height="92" rx="10" fill="#221d19" stroke="#FF4F00" stroke-opacity="0.5" stroke-width="1"/>
+            <text x="455" y="222" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">Receiver</text>
+            <rect x="438" y="235" width="34" height="42" rx="2" fill="none" stroke="#FF4F00" stroke-width="1.4"/>
+            <line x1="443" y1="247" x2="467" y2="247" stroke="#FF4F00" stroke-opacity="0.75"/>
+            <line x1="443" y1="255" x2="465" y2="255" stroke="#FF4F00" stroke-opacity="0.75"/>
+            <line x1="443" y1="263" x2="462" y2="263" stroke="#FF4F00" stroke-opacity="0.75"/>
+          </g>
+          <path d="M 145 200 Q 195 130 250 84" fill="none" stroke="#ECE6DC" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="3 4"/>
+          <path d="M 455 200 Q 405 130 350 84" fill="none" stroke="#ECE6DC" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="3 4"/>
+          <line x1="230" y1="246" x2="370" y2="246" stroke="#FF4F00" stroke-width="2.4"/>
+          <circle cx="230" cy="246" r="4" fill="#FF4F00"/>
+          <circle cx="370" cy="246" r="4" fill="#FF4F00"/>
+          <text x="300" y="240" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">your file</text>
+          <text x="300" y="266" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#FF4F00">peer-to-peer · encrypted</text>
+        </svg>
+        <p class="demo-cap">The relay only sees encrypted handshakes. Your file goes directly between devices.</p>
+      </div>
+    </section>
+
+    <section class="recv-row">
+      <div class="recv-label">
+        <span class="l-name">Receive</span>
+        <span class="l-h">Got a passphrase?</span>
+      </div>
+      <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
+      <button id="pp-go" class="recv-go">Open ↵</button>
+      <div id="pp-err" class="recv-err"></div>
+    </section>
+
+    <section class="selfhost">
+      <div>
+        <h2>Run your own relay.</h2>
+        <p>AirPipe is open-source and self-hostable. One command boots a relay you fully control.</p>
+        <p>Point the CLI at it with <code>AIRPIPE_RELAY</code>.</p>
+        <p class="sh-foot">MIT · <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a></p>
+      </div>
+      <div class="code-stack">
+        <div class="code-block"><code>docker run -p 8080:8080 ghcr.io/sanyam-g/airpipe-relay</code><span class="copy-pill">Copy</span></div>
+        <div class="code-block"><code>curl -sSL https://airpipe.sanyamgarg.com/install.sh | sh</code><span class="copy-pill">Copy</span></div>
+        <div class="code-block"><code>export AIRPIPE_RELAY=https://relay.example.com</code><span class="copy-pill">Copy</span></div>
+      </div>
+    </section>
+
+    <section class="split">
+      <div class="split-col">
+        <h2 class="section-label">Roadmap</h2>
+        <ul class="rm-line">
+          <li><span class="rm-status next">next</span>Persistent multi-file pairing</li>
+          <li><span class="rm-status next">next</span>Receiver-side accept prompt</li>
+          <li><span class="rm-status soon">soon</span>Multi-arch Docker image</li>
+          <li><span class="rm-status soon">soon</span>TURN relay for tricky networks</li>
+          <li><span class="rm-status later">later</span>LAN device auto-discovery</li>
+        </ul>
+        <p class="section-foot"><a href="/development#roadmap">Full roadmap →</a></p>
+      </div>
+      <div class="split-col">
+        <h2 class="section-label">Recent releases</h2>
+        <div id="cl-list" class="cl-line" data-limit="4">Loading…</div>
+        <p class="section-foot"><a href="/development#changelog">Full changelog →</a></p>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>Sanyam Garg, 2026</span>
+      <span class="footer-links">
+        <a href="/development">Development</a>
+        <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Source</a>
+        <a href="https://github.com/Sanyam-G/Airpipe/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
+      </span>
+    </div>
+  </footer>
+
+  <script src="/site/app.js?v=20260514e" defer></script>
+</body>
+</html>

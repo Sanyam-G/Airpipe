@@ -24,6 +24,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sanyamgarg/airpipe/internal/transfer"
+	"github.com/sanyamgarg/airpipe/web"
 	"golang.org/x/time/rate"
 )
 
@@ -584,7 +585,11 @@ func (s *server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	writeStatic(w, "index.html")
+	writeFromFS(w, web.FS(), "index.html")
+}
+
+func (s *server) handleDevelopmentPage(w http.ResponseWriter, r *http.Request) {
+	writeFromFS(w, web.FS(), "development.html")
 }
 
 func (s *server) handleSendPage(w http.ResponseWriter, r *http.Request) {
@@ -641,6 +646,16 @@ func writeStaticContentType(w http.ResponseWriter, name, contentType string) {
 	w.Write(content)
 }
 
+func writeFromFS(w http.ResponseWriter, fsys fs.FS, name string) {
+	content, err := fs.ReadFile(fsys, name)
+	if err != nil {
+		http.Error(w, "page not found", http.StatusNotFound)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Write(content)
+}
+
 func main() {
 	cfg := loadConfig()
 	log := newLogger(cfg.logFormat)
@@ -664,7 +679,9 @@ func main() {
 	mux := http.NewServeMux()
 	staticFS, _ := fs.Sub(staticFiles, "static")
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+	mux.Handle("GET /site/", http.StripPrefix("/site/", http.FileServer(http.FS(web.FS()))))
 	mux.HandleFunc("GET /", s.handleLandingPage)
+	mux.HandleFunc("GET /development", s.handleDevelopmentPage)
 	mux.HandleFunc("GET /send", s.handleSendPage)
 	mux.HandleFunc("GET /install.sh", s.handleInstall)
 	mux.HandleFunc("POST /upload", rateLimit(s.rl, log, s.handleUploadFile))

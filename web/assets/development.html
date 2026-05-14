@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>AirPipe — Development</title>
+<meta name="description" content="Roadmap and full release history for AirPipe.">
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260510a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/landing.css?v=20260514e">
+</head>
+<body class="page-dev">
+
+  <nav class="topnav">
+    <a class="nav-brand" href="/">
+      <span class="brand-mark">A</span>
+      <span>AirPipe</span>
+    </a>
+    <div class="nav-right">
+      <a class="nav-link" href="/">Home</a>
+      <a class="nav-link active" href="/development">Development</a>
+      <a class="nav-link nav-gh" id="nav-gh" href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener" aria-label="GitHub">
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        <span id="gh-stars" class="gh-stars">—</span>
+      </a>
+      <a class="nav-cta" href="/live">Send a file</a>
+    </div>
+  </nav>
+
+  <main class="dev">
+
+    <header class="dev-head">
+      <h1>Development</h1>
+      <p>Roadmap and full release history. Issues and pull requests welcome on <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">GitHub</a>.</p>
+    </header>
+
+    <div class="dev-split">
+      <aside id="roadmap" class="dev-col">
+        <h2 class="section-label">Roadmap</h2>
+        <ul class="rm-line dev-rm">
+          <li>
+            <span class="rm-status next">next</span>
+            <div>
+              <strong>Persistent multi-file pairing</strong>
+              <span class="rm-desc">Today the live session ends after the first file. Keeping it open lets the same sender drop a second file without re-pairing.</span>
+            </div>
+          </li>
+          <li>
+            <span class="rm-status next">next</span>
+            <div>
+              <strong>Receiver-side accept prompt</strong>
+              <span class="rm-desc">One-tap confirmation with the filename and size before saving.</span>
+            </div>
+          </li>
+          <li>
+            <span class="rm-status soon">soon</span>
+            <div>
+              <strong>Multi-arch Docker image</strong>
+              <span class="rm-desc">The relay image ships <code>linux/amd64</code> today. Adding native <code>arm64</code> helps self-hosters on Apple Silicon and Raspberry Pis.</span>
+            </div>
+          </li>
+          <li>
+            <span class="rm-status soon">soon</span>
+            <div>
+              <strong>TURN relay for tricky networks</strong>
+              <span class="rm-desc">A few firewalls block peer-to-peer outright. An optional TURN relay closes the gap.</span>
+            </div>
+          </li>
+          <li>
+            <span class="rm-status later">later</span>
+            <div>
+              <strong>LAN device auto-discovery</strong>
+              <span class="rm-desc">Devices on the same network or tailnet pick each other from a list, instead of typing a passphrase.</span>
+            </div>
+          </li>
+          <li>
+            <span class="rm-status later">later</span>
+            <div>
+              <strong>Configurable mailbox limits</strong>
+              <span class="rm-desc">The mailbox is hard-coded to 500 MB and 10 minutes today. Self-hosters should be able to set their own.</span>
+            </div>
+          </li>
+          <li>
+            <span class="rm-status later">later</span>
+            <div>
+              <strong>Storage caps</strong>
+              <span class="rm-desc">A total-bytes ceiling per relay with backpressure on new uploads, so self-hosted relays can't be abused.</span>
+            </div>
+          </li>
+        </ul>
+        <p class="section-foot">Got an idea? <a href="https://github.com/Sanyam-G/Airpipe/issues/new" target="_blank" rel="noopener">Open an issue</a>.</p>
+      </aside>
+      <div class="divider-v"></div>
+      <section id="changelog" class="dev-col">
+        <h2 class="section-label">Changelog</h2>
+        <div id="cl-list" class="cl-full" data-limit="50">Loading…</div>
+      </section>
+    </div>
+
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span>Sanyam Garg, 2026</span>
+      <span class="footer-links">
+        <a href="/">Home</a>
+        <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Source</a>
+        <a href="https://github.com/Sanyam-G/Airpipe/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
+      </span>
+    </div>
+  </footer>
+
+  <script src="/site/app.js?v=20260514e" defer></script>
+</body>
+</html>
