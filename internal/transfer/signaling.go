@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -244,7 +245,7 @@ func tailReader(reads <-chan wsRead) msgReader {
 	return func() (Message, error) {
 		r, ok := <-reads
 		if !ok {
-			return Message{}, fmt.Errorf("signaling channel closed")
+			return Message{}, io.EOF
 		}
 		return r.msg, r.err
 	}

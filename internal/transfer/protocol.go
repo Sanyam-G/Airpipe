@@ -22,6 +22,7 @@ const (
 	MsgTypeP2PReady     MessageType = 0x33
 	MsgTypeP2PFail      MessageType = 0x34
 	MsgTypePeerJoin     MessageType = 0x35
+	MsgTypeSessionEnd   MessageType = 0x36
 )
 
 const ProtocolVersion byte = 2
@@ -118,6 +119,10 @@ func NewP2PFailMessage(reason string) Message {
 
 func NewPeerJoinMessage() Message {
 	return Message{Type: MsgTypePeerJoin, Payload: nil}
+}
+
+func NewSessionEndMessage() Message {
+	return Message{Type: MsgTypeSessionEnd, Payload: nil}
 }
 
 func ParseMetadata(payload []byte) (Metadata, error) {

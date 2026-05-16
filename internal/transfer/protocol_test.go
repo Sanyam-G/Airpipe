@@ -18,6 +18,7 @@ func TestEncodeDecodeRoundtrip(t *testing.T) {
 		{"error", MsgTypeError, []byte("something broke")},
 		{"empty chunk", MsgTypeChunk, []byte{}},
 		{"large payload", MsgTypeChunk, bytes.Repeat([]byte("x"), 64*1024)},
+		{"session_end", MsgTypeSessionEnd, nil},
 	}
 
 	for _, tt := range tests {
@@ -104,6 +105,13 @@ func TestNewErrorMessage(t *testing.T) {
 	}
 	if string(msg.Payload) != "failed" {
 		t.Fatalf("expected 'failed', got %q", string(msg.Payload))
+	}
+}
+
+func TestNewSessionEndMessage(t *testing.T) {
+	msg := NewSessionEndMessage()
+	if msg.Type != MsgTypeSessionEnd {
+		t.Fatalf("expected MsgTypeSessionEnd")
 	}
 }
 

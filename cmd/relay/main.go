@@ -334,12 +334,30 @@ func (room *Room) AddClient(conn *websocket.Conn) bool {
 
 func (room *Room) RemoveClient(conn *websocket.Conn) {
 	room.mu.Lock()
-	defer room.mu.Unlock()
+	nBefore := len(room.clients)
+	idx := -1
 	for i, c := range room.clients {
 		if c == conn {
-			room.clients = append(room.clients[:i], room.clients[i+1:]...)
+			idx = i
 			break
 		}
+	}
+	if idx < 0 {
+		room.mu.Unlock()
+		return
+	}
+	room.clients = append(room.clients[:idx], room.clients[idx+1:]...)
+
+	var toKick []*websocket.Conn
+	if nBefore == 2 && len(room.clients) == 1 {
+		toKick = append(toKick, room.clients[0])
+		room.clients = room.clients[:0]
+	}
+	room.mu.Unlock()
+
+	for _, oc := range toKick {
+		_ = oc.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "peer disconnected"))
+		oc.Close()
 	}
 }
 

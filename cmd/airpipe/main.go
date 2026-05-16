@@ -21,6 +21,7 @@ import (
 
 	"github.com/sanyamgarg/airpipe/internal/archive"
 	"github.com/sanyamgarg/airpipe/internal/crypto"
+	"github.com/sanyamgarg/airpipe/internal/mailbox"
 	"github.com/sanyamgarg/airpipe/internal/passphrase"
 	"github.com/sanyamgarg/airpipe/internal/qr"
 	"github.com/sanyamgarg/airpipe/internal/transfer"
@@ -30,7 +31,7 @@ const defaultRelay = "https://airpipe.sanyamgarg.com"
 
 // ANSI escape codes
 const (
-	colorBrand  = "\033[38;2;255;79;0m"
+	colorBrand = "\033[38;2;255;79;0m"
 	colorGreen = "\033[32m"
 	colorRed   = "\033[31m"
 	colorDim   = "\033[2m"
@@ -39,9 +40,9 @@ const (
 )
 
 func printUsage() {
-	fmt.Printf("Usage: %sairpipe%s send [--mode p2p|mailbox] <file> [file2...]\n", colorBold, colorReset)
-	fmt.Printf("       %sairpipe%s receive [dir]\n", colorBold, colorReset)
-	fmt.Printf("       %sairpipe%s download <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
+	fmt.Printf("Usage: %sairpipe%s send [--stay-open] [--mode p2p|mailbox] <file> [file2...]\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s receive [--stay-open] [dir]\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s download [--stay-open] <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
 	fmt.Printf("       %sairpipe%s update\n", colorBold, colorReset)
 	fmt.Printf("       %sairpipe%s help\n\n", colorBold, colorReset)
 	fmt.Printf("Run %sairpipe help%s for details.\n", colorBold, colorReset)
@@ -54,19 +55,25 @@ func printHelp() {
 	fmt.Printf("\n%sairpipe%s — peer-to-peer encrypted file transfer\n\n", b, r)
 
 	fmt.Printf("%sCommands%s\n", b, r)
-	fmt.Printf("  %ssend%s [--mode p2p|mailbox] <file> [file2...]\n", b, r)
+	fmt.Printf("  %ssend%s [--stay-open] [--mode p2p|mailbox] <file> [file2...]\n", b, r)
 	fmt.Printf("      Encrypt and share a file. You get a passphrase like %sRIVER FALCON MARBLE 42%s.\n", b, r)
-	fmt.Printf("      Multiple files or a folder are auto-zipped.\n")
+	fmt.Printf("      In %sp2p%s mode, multiple files stream in one session; a %sfolder%s is zipped.\n", b, r, b, r)
+	fmt.Printf("      In %smailbox%s mode, multiple files ship in one upload without zipping;\n", b, r)
+	fmt.Printf("        %sfolders%s (or mixes with folders) still become one zip upload.\n", b, r)
 	fmt.Printf("        %s--mode p2p%s      Stream directly between sender and receiver over WebRTC.\n", b, r)
 	fmt.Printf("        %s--mode mailbox%s  Upload to the relay; receiver downloads later.\n", b, r)
 	fmt.Printf("                        10-minute expiry, 500 MB cap.\n")
+	fmt.Printf("        %s--stay-open%s    After a p2p batch, prompt for more files (receiver needs %s--stay-open%s too).\n", b, r, b, r)
 	fmt.Printf("        %s(default: prompt)%s\n\n", d, r)
 
-	fmt.Printf("  %sreceive%s [dir]\n", b, r)
-	fmt.Printf("      Wait for someone to send a file to you. Defaults to current directory.\n\n")
+	fmt.Printf("  %sreceive%s [--stay-open] [dir]\n", b, r)
+	fmt.Printf("      Wait for someone to send a file to you. Defaults to current directory.\n")
+	fmt.Printf("      %s--stay-open%s keeps the session open for more batches.\n\n", b, r)
 
-	fmt.Printf("  %sdownload%s <WORD WORD WORD NN> [dir]\n", b, r)
-	fmt.Printf("      Download a file using a passphrase someone shared.\n\n")
+	fmt.Printf("  %sdownload%s [--stay-open] <WORD WORD WORD NN> [dir]\n", b, r)
+	fmt.Printf("      Download mailbox or live payloads using a passphrase someone shared.\n")
+	fmt.Printf("      Mailbox bundles with several files decrypt to separate saves.\n")
+	fmt.Printf("      With live p2p, %s--stay-open%s waits for extra batches after the first.\n\n", b, r)
 
 	fmt.Printf("  %supdate%s\n", b, r)
 	fmt.Printf("      Self-update the CLI binary in place.\n\n")
@@ -81,7 +88,8 @@ func printHelp() {
 
 	fmt.Printf("%sExamples%s\n", b, r)
 	fmt.Printf("  airpipe send report.pdf\n")
-	fmt.Printf("  airpipe send photos/ docs/                  %s# zips everything%s\n", d, r)
+	fmt.Printf("  airpipe send report.pdf notes.txt    %s# p2p: two files, one connection%s\n", d, r)
+	fmt.Printf("  airpipe send photos/ docs/          %s# mailed or p2p with dirs: zip%s\n", d, r)
 	fmt.Printf("  airpipe download RIVER FALCON MARBLE 42\n")
 	fmt.Printf("  airpipe receive ~/Downloads\n")
 	fmt.Printf("  airpipe --relay https://my.relay send a.zip\n\n")
@@ -117,19 +125,20 @@ func main() {
 	switch args[0] {
 	case "send":
 		if len(args) < 2 {
-			fmt.Println("Usage: airpipe send [--mode p2p|mailbox] <file> [file2...]")
+			fmt.Println("Usage: airpipe send [--stay-open] [--mode p2p|mailbox] <file> [file2...]")
 			os.Exit(1)
 		}
 		err = cmdSend(*relay, args[1:])
 	case "receive":
+		stayOpen, rest := parseStayOpenFlags(args[1:])
 		dir := "."
-		if len(args) >= 2 {
-			dir = args[1]
+		if len(rest) >= 1 {
+			dir = rest[0]
 		}
-		err = cmdReceive(*relay, dir)
+		err = cmdReceive(*relay, dir, stayOpen)
 	case "download":
 		if len(args) < 2 {
-			fmt.Println("Usage: airpipe download <WORD WORD WORD NN> [dir]")
+			fmt.Println("Usage: airpipe download [--stay-open] <WORD WORD WORD NN> [dir]")
 			os.Exit(1)
 		}
 		err = cmdDownload(*relay, args[1:])
@@ -150,31 +159,70 @@ func main() {
 	}
 }
 
+func parseStayOpenFlags(args []string) (stayOpen bool, rest []string) {
+	for _, a := range args {
+		if a == "--stay-open" {
+			stayOpen = true
+			continue
+		}
+		rest = append(rest, a)
+	}
+	return stayOpen, rest
+}
+
 func cmdSend(relay string, args []string) error {
 	sendFS := flag.NewFlagSet("send", flag.ContinueOnError)
 	mode := sendFS.String("mode", "", "p2p | mailbox (default: prompt)")
+	stayOpen := sendFS.Bool("stay-open", false, "after each p2p batch, prompt for more files (requires receiver --stay-open)")
 	if err := sendFS.Parse(args); err != nil {
 		return err
 	}
 	files := sendFS.Args()
 	if len(files) == 0 {
-		return fmt.Errorf("usage: airpipe send [--mode p2p|mailbox] <file> [file2...]")
+		return fmt.Errorf("usage: airpipe send [--stay-open] [--mode p2p|mailbox] <file> [file2...]")
 	}
 
+	anyDir := false
 	for _, f := range files {
-		if _, err := os.Stat(f); err != nil {
+		info, err := os.Stat(f)
+		if err != nil {
 			return fmt.Errorf("not found: %s", f)
 		}
+		if info.IsDir() {
+			anyDir = true
+		}
+	}
+	resolvedMode, err := resolveMode(*mode)
+	if err != nil {
+		return err
 	}
 
-	needsZip := len(files) > 1
-	if !needsZip {
-		info, _ := os.Stat(files[0])
-		needsZip = info.IsDir()
-	}
+	mailboxMultiNative := resolvedMode == "mailbox" && !anyDir && len(files) > 1
+	needsZip := anyDir || (len(files) > 1 && !mailboxMultiNative)
 
 	var uploadPath, filename string
-	if needsZip {
+	var p2pNative []string
+	var mailboxNative []string
+
+	if resolvedMode == "p2p" && !anyDir {
+		p2pNative = files
+		banner("send")
+		for _, f := range files {
+			stat, _ := os.Stat(f)
+			fmt.Printf("  %s%s%s  %s%s%s\n", colorBold, filepath.Base(f), colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
+		}
+		if len(files) > 1 {
+			fmt.Println()
+		}
+	} else if mailboxMultiNative {
+		mailboxNative = files
+		banner("send")
+		for _, f := range files {
+			stat, _ := os.Stat(f)
+			fmt.Printf("  %s%s%s  %s%s%s\n", colorBold, filepath.Base(f), colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
+		}
+		fmt.Printf("\n  %smailbox%s packing %d files…\n\n", colorDim, colorReset, len(files))
+	} else if needsZip {
 		banner("send")
 		fmt.Printf("  Zipping %d items...", len(files))
 		zipPath, err := archive.ZipPaths(files)
@@ -194,23 +242,28 @@ func cmdSend(relay string, args []string) error {
 		fmt.Printf("  %s%s%s  %s%s%s\n", colorBold, filename, colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
 	}
 
-	resolvedMode, err := resolveMode(*mode)
-	if err != nil {
-		return err
-	}
-
 	phrase := passphrase.Generate()
 	derivedToken := passphrase.DeriveToken(phrase)
 	derivedKeyArr := passphrase.DeriveKey(phrase)
 	derivedKey := derivedKeyArr[:]
+
+	if *stayOpen && resolvedMode != "p2p" {
+		return fmt.Errorf("--stay-open is only supported in p2p mode (--mode p2p)")
+	}
 
 	httpRelay := toHTTP(relay)
 	wsRelay := toWS(relay)
 
 	switch resolvedMode {
 	case "p2p":
-		return sendP2P(wsRelay, httpRelay, uploadPath, filename, phrase, derivedToken, derivedKey)
+		if p2pNative != nil {
+			return sendP2P(wsRelay, httpRelay, p2pNative, phrase, derivedToken, derivedKey, *stayOpen)
+		}
+		return sendP2P(wsRelay, httpRelay, []string{uploadPath}, phrase, derivedToken, derivedKey, *stayOpen)
 	case "mailbox":
+		if len(mailboxNative) > 0 {
+			return sendMailboxNative(httpRelay, mailboxNative, phrase, derivedToken, derivedKey)
+		}
 		return sendMailbox(httpRelay, uploadPath, filename, phrase, derivedToken, derivedKey)
 	}
 	return fmt.Errorf("invalid mode: %s", resolvedMode)
@@ -273,7 +326,60 @@ func sendMailbox(httpRelay, uploadPath, filename, phrase, derivedToken string, d
 	return nil
 }
 
-func sendP2P(wsRelay, httpRelay, uploadPath, filename, phrase, derivedToken string, derivedKey []byte) error {
+func sendMailboxNative(httpRelay string, paths []string, phrase, derivedToken string, derivedKey []byte) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("nothing to send")
+	}
+	fmt.Print("  Encrypting...")
+	entries := make([]mailbox.Entry, 0, len(paths))
+	for _, p := range paths {
+		raw, err := os.ReadFile(p)
+		if err != nil {
+			return fmt.Errorf("read %s: %w", p, err)
+		}
+		entries = append(entries, mailbox.Entry{Name: filepath.Base(p), Content: raw})
+	}
+	plaintext, err := mailbox.EncodeAMB2(entries)
+	if err != nil {
+		return fmt.Errorf("pack files: %w", err)
+	}
+	ciphertext, err := crypto.Encrypt(plaintext, derivedKey)
+	if err != nil {
+		return fmt.Errorf("encryption failed: %w", err)
+	}
+
+	fmt.Printf("\r  Encrypted %s✓%s\n", colorGreen, colorReset)
+	fmt.Print("  Uploading...\n\n")
+
+	token, err := uploadEncrypted(httpRelay, ciphertext, derivedToken)
+	if err != nil {
+		return err
+	}
+
+	displayPassphrase(phrase, httpRelay, token, derivedKey)
+	fmt.Printf("  %sE2E encrypted. Expires in 10 minutes.%s\n\n", colorDim, colorReset)
+	return nil
+}
+
+func mailboxUniqueSavePath(destDir, safeFilename string) string {
+	p := filepath.Join(destDir, safeFilename)
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return p
+	}
+	ext := filepath.Ext(safeFilename)
+	base := strings.TrimSuffix(safeFilename, ext)
+	for i := 1; ; i++ {
+		p = filepath.Join(destDir, fmt.Sprintf("%s(%d)%s", base, i, ext))
+		if _, err := os.Stat(p); os.IsNotExist(err) {
+			return p
+		}
+	}
+}
+
+func sendP2P(wsRelay, httpRelay string, paths []string, phrase, derivedToken string, derivedKey []byte, stayOpen bool) error {
+	if len(paths) == 0 {
+		return fmt.Errorf("nothing to send")
+	}
 	displayPassphrase(phrase, httpRelay, derivedToken, derivedKey)
 	fmt.Printf("  %sWaiting for receiver to join...%s\n\n", colorDim, colorReset)
 
@@ -288,12 +394,90 @@ func sendP2P(wsRelay, httpRelay, uploadPath, filename, phrase, derivedToken stri
 	}
 	fmt.Printf("  %s✓ Receiver joined%s\n", colorGreen, colorReset)
 
-	stat, _ := os.Stat(uploadPath)
-	if err := sender.SendFile(uploadPath, progress); err != nil {
-		return fmt.Errorf("send file: %w", err)
+	progressBatch := func(batch []string) func(fileIdx int, sent, total int64) {
+		return func(fileIdx int, sent, total int64) {
+			if len(batch) > 1 {
+				fmt.Fprintf(os.Stderr, "\n  [%d/%d] %s ", fileIdx+1, len(batch), filepath.Base(batch[fileIdx]))
+			}
+			progress(sent, total)
+		}
 	}
-	fmt.Printf("\r  %s✓ Sent %s%s  %s(%s)%s\n\n", colorGreen, colorReset, filename, colorDim, fmtBytes(stat.Size()), colorReset)
+
+	sendAndSummarize := func(batch []string) error {
+		var sendFn func([]string) error
+		if stayOpen {
+			sendFn = func(b []string) error {
+				return sender.SendBatch(b, progressBatch(b))
+			}
+		} else {
+			sendFn = func(b []string) error {
+				return sender.SendFiles(b, progressBatch(b))
+			}
+		}
+		if err := sendFn(batch); err != nil {
+			return fmt.Errorf("send file: %w", err)
+		}
+		fmt.Fprintf(os.Stderr, "\r%s\n", strings.Repeat(" ", 80))
+		printSentBatchSummary(batch)
+		return nil
+	}
+
+	batch := paths
+	for {
+		if err := sendAndSummarize(batch); err != nil {
+			return err
+		}
+		if !stayOpen {
+			break
+		}
+		next, err := readNextSendPaths()
+		if err != nil {
+			return err
+		}
+		if len(next) == 0 {
+			break
+		}
+		batch = next
+	}
+	fmt.Println()
 	return nil
+}
+
+func printSentBatchSummary(paths []string) {
+	if len(paths) == 1 {
+		stat, _ := os.Stat(paths[0])
+		fmt.Printf("\r  %s✓ Sent %s%s  %s(%s)%s\n", colorGreen, colorReset, filepath.Base(paths[0]), colorDim, fmtBytes(stat.Size()), colorReset)
+		return
+	}
+	fmt.Printf("  %s✓ Sent %d files%s\n", colorGreen, len(paths), colorReset)
+	for _, p := range paths {
+		stat, _ := os.Stat(p)
+		fmt.Printf("    %s%s%s  %s%s%s\n", colorBold, filepath.Base(p), colorReset, colorDim, fmtBytes(stat.Size()), colorReset)
+	}
+}
+
+func readNextSendPaths() ([]string, error) {
+	fmt.Fprintf(os.Stderr, "\n  %sMore files? Enter paths (space-separated), or press Enter to finish:%s ", colorDim, colorReset)
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil {
+		return nil, err
+	}
+	fields := strings.Fields(strings.TrimSpace(line))
+	if len(fields) == 0 {
+		return nil, nil
+	}
+	var out []string
+	for _, p := range fields {
+		info, err := os.Stat(p)
+		if err != nil {
+			return nil, fmt.Errorf("not found: %s", p)
+		}
+		if info.IsDir() {
+			return nil, fmt.Errorf("folders must be zipped for p2p; choose files only, or start a new send: %s", p)
+		}
+		out = append(out, p)
+	}
+	return out, nil
 }
 
 func displayPassphrase(phrase, httpRelay, token string, key []byte) {
@@ -308,7 +492,7 @@ func displayPassphrase(phrase, httpRelay, token string, key []byte) {
 	fmt.Printf("\n  %sDirect link:%s %s\n\n", colorDim, colorReset, url)
 }
 
-func cmdReceive(relay, destDir string) error {
+func cmdReceive(relay, destDir string, stayOpen bool) error {
 	token := genToken()
 	key, _ := crypto.GenerateKey()
 
@@ -318,6 +502,9 @@ func cmdReceive(relay, destDir string) error {
 
 	banner("receive")
 	fmt.Printf("  Destination: %s%s%s\n\n", colorBold, destDir, colorReset)
+	if stayOpen {
+		fmt.Printf("  %sStay-open:%s waiting for multiple batches on this link (Ctrl+C to stop).\n\n", colorDim, colorReset)
+	}
 	qr.GenerateTerminal(url)
 	fmt.Printf("\n  %s%s%s\n\n  %sWaiting for sender...%s\n\n", colorBrand, url, colorReset, colorDim, colorReset)
 
@@ -327,15 +514,40 @@ func cmdReceive(relay, destDir string) error {
 	}
 	defer receiver.Close()
 
-	savedPath, err := receiver.ReceiveFile(destDir, progress)
+	if stayOpen {
+		err := receiver.ReceiveBatches(destDir, func(batchIdx int, paths []string) error {
+			if batchIdx > 0 {
+				fmt.Printf("\n  %s--- batch %d ---%s\n", colorDim, batchIdx+1, colorReset)
+			}
+			for _, savedPath := range paths {
+				fmt.Printf("\n  %s✓ Saved: %s%s\n", colorGreen, savedPath, colorReset)
+			}
+			return nil
+		}, func(_ int, received, total int64) {
+			progress(received, total)
+		})
+		if err != nil {
+			return err
+		}
+		fmt.Println()
+		return nil
+	}
+
+	savedPaths, err := receiver.ReceiveFiles(destDir, func(_ int, received, total int64) {
+		progress(received, total)
+	})
 	if err != nil {
 		return err
 	}
-	fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
+	for _, savedPath := range savedPaths {
+		fmt.Printf("\n  %s✓ Saved: %s%s\n", colorGreen, savedPath, colorReset)
+	}
+	fmt.Println()
 	return nil
 }
 
 func cmdDownload(relay string, args []string) error {
+	stayOpen, args := parseStayOpenFlags(args)
 	// Parse passphrase: last arg might be a directory, or part of the passphrase
 	// Passphrase is typically 5 tokens: WORD WORD WORD WORD NN
 	// Try to detect if last arg is a directory
@@ -356,7 +568,11 @@ func cmdDownload(relay string, args []string) error {
 
 	banner("download")
 	fmt.Printf("  Passphrase: %s%s%s\n", colorBrand, passphrase.Normalize(phrase), colorReset)
-	fmt.Printf("  Destination: %s%s%s\n\n", colorBold, destDir, colorReset)
+	fmt.Printf("  Destination: %s%s%s\n", colorBold, destDir, colorReset)
+	if stayOpen {
+		fmt.Printf("  %sStay-open:%s will wait for more batches if the sender uses a live session.\n", colorDim, colorReset)
+	}
+	fmt.Println()
 	fmt.Print("  Looking up...")
 
 	httpRelay := toHTTP(relay)
@@ -376,11 +592,35 @@ func cmdDownload(relay string, args []string) error {
 		}
 		defer receiver.Close()
 
-		savedPath, err := receiver.ReceiveFile(destDir, progress)
+		if stayOpen {
+			err := receiver.ReceiveBatches(destDir, func(batchIdx int, paths []string) error {
+				if batchIdx > 0 {
+					fmt.Printf("\n  %s--- batch %d ---%s\n", colorDim, batchIdx+1, colorReset)
+				}
+				for _, savedPath := range paths {
+					fmt.Printf("\n  %s✓ Saved: %s%s\n", colorGreen, savedPath, colorReset)
+				}
+				return nil
+			}, func(_ int, received, total int64) {
+				progress(received, total)
+			})
+			if err != nil {
+				return fmt.Errorf("p2p receive: %w", err)
+			}
+			fmt.Println()
+			return nil
+		}
+
+		savedPaths, err := receiver.ReceiveFiles(destDir, func(_ int, received, total int64) {
+			progress(received, total)
+		})
 		if err != nil {
 			return fmt.Errorf("p2p receive: %w", err)
 		}
-		fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savedPath, colorReset)
+		for _, savedPath := range savedPaths {
+			fmt.Printf("\n  %s✓ Saved: %s%s\n", colorGreen, savedPath, colorReset)
+		}
+		fmt.Println()
 		return nil
 	}
 	if resp.StatusCode != http.StatusOK {
@@ -411,33 +651,22 @@ func cmdDownload(relay string, args []string) error {
 	}
 	fmt.Printf("\r  Decrypted %s✓%s\n", colorGreen, colorReset)
 
-	if len(plaintext) < 4 {
-		return fmt.Errorf("invalid payload")
+	entries, err := mailbox.Decode(plaintext)
+	if err != nil {
+		return fmt.Errorf("invalid mailbox payload: %w", err)
 	}
-	fnLen := int(binary.BigEndian.Uint32(plaintext[:4]))
-	if len(plaintext) < 4+fnLen {
-		return fmt.Errorf("invalid payload")
-	}
-	filename := string(plaintext[4 : 4+fnLen])
-	content := plaintext[4+fnLen:]
-
-	savePath := filepath.Join(destDir, filename)
-	if _, err := os.Stat(savePath); err == nil {
-		base := strings.TrimSuffix(filename, filepath.Ext(filename))
-		ext := filepath.Ext(filename)
-		for i := 1; ; i++ {
-			savePath = filepath.Join(destDir, fmt.Sprintf("%s(%d)%s", base, i, ext))
-			if _, err := os.Stat(savePath); os.IsNotExist(err) {
-				break
-			}
+	for _, ent := range entries {
+		safe, err := transfer.SafeFilename(ent.Name)
+		if err != nil {
+			return fmt.Errorf("unsafe filename %q: %w", ent.Name, err)
 		}
+		savePath := mailboxUniqueSavePath(destDir, safe)
+		if err := os.WriteFile(savePath, ent.Content, 0644); err != nil {
+			return fmt.Errorf("save failed: %w", err)
+		}
+		fmt.Printf("\n  %s✓ Saved: %s%s\n", colorGreen, savePath, colorReset)
 	}
-
-	if err := os.WriteFile(savePath, content, 0644); err != nil {
-		return fmt.Errorf("save failed: %w", err)
-	}
-
-	fmt.Printf("\n  %s✓ Saved: %s%s\n\n", colorGreen, savePath, colorReset)
+	fmt.Println()
 	return nil
 }
 

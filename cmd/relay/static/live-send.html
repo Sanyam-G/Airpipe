@@ -23,7 +23,7 @@
 
   <section id="waiting" class="block">
     <h2>Share this passphrase</h2>
-    <p class="block-sub">Tell your receiver. They type it at <code id="phrase-domain">airpipe.sanyamgarg.com</code>, scan the QR, or run <code>airpipe download &lt;passphrase&gt;</code>. Both browsers pair, then you pick a file.</p>
+    <p class="block-sub">Tell your receiver. They type it at <code id="phrase-domain">airpipe.sanyamgarg.com</code>, scan the QR, or run <code>airpipe download &lt;passphrase&gt;</code>. Both browsers pair, then you pick one or more files.</p>
 
     <div class="phrase-display">
       <div class="phrase-words" id="phrase-display" onclick="copyPhrase()">-</div>
@@ -39,14 +39,14 @@
   </section>
 
   <section id="select" class="block hidden">
-    <h2>Drop a file</h2>
-    <p class="block-sub">It encrypts in your browser, negotiates a direct connection, and streams to the receiver. Falls back through the relay if a direct link fails.</p>
+    <h2>Drop file(s)</h2>
+    <p class="block-sub">It encrypts in your browser, negotiates a direct connection, and streams to the receiver. Falls back through the relay if a direct link fails. Multiple files send in one connection.</p>
     <div class="drop-zone" id="dropzone">
       <div class="drop-icon">+</div>
-      <div class="drop-label">tap to select or <strong>drop a file</strong></div>
+      <div class="drop-label">tap to select or <strong>drop files</strong></div>
       <div class="drop-hint">any type · any size</div>
     </div>
-    <input type="file" id="fileinput">
+    <input type="file" id="fileinput" multiple>
   </section>
 
   <section id="negotiating" class="block hidden">
@@ -68,13 +68,25 @@
     <div class="speed-info" id="speed"></div>
   </section>
 
+  <section id="batch-done" class="block hidden">
+    <div class="checkmark">✓</div>
+    <h2 style="color:var(--accent)">Batch sent</h2>
+    <div class="transport" id="batch-done-transport"></div>
+    <div class="filename" id="batch-done-name">-</div>
+    <div class="size-info" id="batch-done-size"></div>
+    <p class="block-sub">Same secure link — send another batch whenever you’re ready.</p>
+    <div class="batch-actions">
+      <button type="button" class="cta cta-primary" id="send-more-btn">Send more files</button>
+    </div>
+  </section>
+
   <section id="complete" class="block hidden">
     <div class="checkmark">✓</div>
     <h2 style="color:var(--accent)">Transfer complete</h2>
     <div class="transport" id="done-transport"></div>
     <div class="filename" id="done-name">-</div>
     <div class="size-info" id="done-size"></div>
-    <p class="block-sub">Reload to send another file.</p>
+    <p class="block-sub">You can leave this page or reload to start over.</p>
   </section>
 
   <section id="error" class="block hidden">
@@ -108,6 +120,7 @@ const MSG_METADATA=0x01, MSG_READY=0x02, MSG_COMPLETE=0x03, MSG_ERROR=0x04;
 const MSG_CHUNK=0x10;
 const MSG_SDP_OFFER=0x30, MSG_SDP_ANSWER=0x31, MSG_ICE_CANDIDATE=0x32;
 const MSG_P2P_READY=0x33, MSG_P2P_FAIL=0x34, MSG_PEER_JOIN=0x35;
+const MSG_SESSION_END=0x36;
 
 const ICE_SERVERS=[
   {urls:'stun:stun.l.google.com:19302'},
@@ -183,7 +196,7 @@ function decode(data){
   return {type,payload:data.slice(5,5+len)};
 }
 function show(id){
-  ['waiting','select','negotiating','sending','complete','error'].forEach(x=>$(x).classList.add('hidden'));
+  ['waiting','select','negotiating','sending','batch-done','complete','error'].forEach(x=>$(x).classList.add('hidden'));
   $(id).classList.remove('hidden');
 }
 function showError(msg){
@@ -201,6 +214,8 @@ let ws=null;
 let pc=null, dc=null;
 let phase='waiting';
 let peerJoined=false;
+let transportReady=false;
+let usingP2PMedia=false;
 
 function copyURL(){
   navigator.clipboard.writeText(shareURL);
@@ -270,6 +285,10 @@ function attachWS(){
   ws.onclose=()=>{
     if(phase==='sending'||phase==='negotiating'){
       showError('Connection closed during '+phase+'. Receiver may have disconnected.');
+      return;
+    }
+    if(phase==='batch-done'){
+      return;
     }
   };
 
@@ -311,51 +330,75 @@ init().catch(e=>showError(e.message||String(e)));
 const dropzone=$('dropzone');
 const fileinput=$('fileinput');
 dropzone.addEventListener('click',()=>fileinput.click());
-fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFile(e.target.files[0])});
+fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFiles(e.target.files)});
+$('send-more-btn').addEventListener('click',()=>{
+  phase='select';
+  show('select');
+  fileinput.value='';
+});
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop',(e)=>{
   e.preventDefault();
   dropzone.classList.remove('dragover');
-  if(e.dataTransfer.files.length)sendFile(e.dataTransfer.files[0]);
+  if(e.dataTransfer.files.length)sendFiles(e.dataTransfer.files);
 });
 
-async function sendFile(file){
-  $('filename').textContent=file.name;
-  $('send-size').textContent=formatSize(file.size);
-  $('neg-name').textContent=file.name;
+async function sendFiles(fileList){
+  const files=[...fileList];
+  if(!files.length)return;
+  $('neg-name').textContent=files.length===1?files[0].name:(files.length+' files');
 
   try{
-    phase='negotiating';
-    show('negotiating');
-
-    let usingP2P=false;
-    try{
-      await negotiateP2P();
-      usingP2P=true;
-    }catch(e){
-      console.warn('p2p negotiation failed, falling back to relay:',e);
-      if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
-    }
-
-    phase='sending';
-    show('sending');
-    if(usingP2P){
-      $('transport').textContent='direct · WebRTC DataChannel';
-      ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
-      await streamFile(file,sendDC);
-      while(dc.bufferedAmount>0){await sleep(10)}
+    if(!transportReady){
+      phase='negotiating';
+      show('negotiating');
+      try{
+        await negotiateP2P();
+        usingP2PMedia=true;
+      }catch(e){
+        console.warn('p2p negotiation failed, falling back to relay:',e);
+        usingP2PMedia=false;
+        if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
+      }
+      phase='sending';
+      show('sending');
+      if(usingP2PMedia){
+        $('transport').textContent='direct · WebRTC DataChannel';
+        ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
+      }else{
+        $('transport').textContent='via relay · P2P unavailable';
+        ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
+      }
+      transportReady=true;
     }else{
-      $('transport').textContent='via relay · P2P unavailable';
-      ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
-      await streamFile(file,sendWS);
+      phase='sending';
+      show('sending');
+      $('transport').textContent=usingP2PMedia?'direct · WebRTC DataChannel':'via relay · P2P unavailable';
     }
 
-    phase='complete';
-    $('done-name').textContent=file.name;
-    $('done-size').textContent=formatSize(file.size);
-    $('done-transport').textContent=usingP2P?'direct · WebRTC':'via relay';
-    show('complete');
+    const sendFn=usingP2PMedia?sendDC:sendWS;
+    let totalSent=0;
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      const label=files.length>1?'('+String(i+1)+'/'+String(files.length)+') ':'';
+      $('filename').textContent=label+file.name;
+      $('send-size').textContent=formatSize(file.size);
+      $('progress').style.width='0%';
+      $('ptext').textContent='0%';
+      await streamFile(file,sendFn);
+      totalSent+=file.size;
+    }
+    if(usingP2PMedia){
+      while(dc.bufferedAmount>0){await sleep(10)}
+    }
+    await sendFn(encode(MSG_SESSION_END,new Uint8Array(0)));
+
+    phase='batch-done';
+    $('batch-done-name').textContent=files.length===1?files[0].name:(String(files.length)+' files');
+    $('batch-done-size').textContent=formatSize(totalSent);
+    $('batch-done-transport').textContent=usingP2PMedia?'direct · WebRTC':'via relay';
+    show('batch-done');
   }catch(err){
     showError(err.message||String(err));
   }

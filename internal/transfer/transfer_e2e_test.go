@@ -50,6 +50,18 @@ func startTestRelay(t *testing.T) *httptest.Server {
 		for {
 			mt, msg, err := conn.ReadMessage()
 			if err != nil {
+				rm.mu.Lock()
+				var toClose []*websocket.Conn
+				for _, c := range rm.clients {
+					if c != conn {
+						toClose = append(toClose, c)
+					}
+				}
+				rm.clients = nil
+				rm.mu.Unlock()
+				for _, c := range toClose {
+					c.Close()
+				}
 				break
 			}
 			rm.mu.Lock()
@@ -291,7 +303,15 @@ func simulateWebSender(relayURL, token string, key, fileContent []byte, filename
 	if err != nil {
 		return err
 	}
-	return conn.WriteMessage(websocket.BinaryMessage, completeData)
+	if err := conn.WriteMessage(websocket.BinaryMessage, completeData); err != nil {
+		return err
+	}
+	// 6. Session end (matches browser sender after last file).
+	sessionEnd, err := encrypt(encode(0x36, []byte{}))
+	if err != nil {
+		return err
+	}
+	return conn.WriteMessage(websocket.BinaryMessage, sessionEnd)
 }
 
 func itoa(n int) string {

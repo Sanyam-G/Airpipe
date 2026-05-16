@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,6 +35,8 @@ func SafeFilename(raw string) (string, error) {
 	}
 	return raw, nil
 }
+
+type msgReader func() (Message, error)
 
 type Receiver struct {
 	relayURL string
@@ -116,46 +119,208 @@ func uniquePath(path string) string {
 }
 
 func (r *Receiver) ReceiveFile(destDir string, progressFn func(received, total int64)) (string, error) {
-	info, err := os.Stat(destDir)
+	paths, err := r.ReceiveFiles(destDir, func(_ int, received, total int64) {
+		if progressFn != nil {
+			progressFn(received, total)
+		}
+	})
 	if err != nil {
-		return "", fmt.Errorf("destination directory %q does not exist: %w", destDir, err)
+		return "", err
 	}
-	if !info.IsDir() {
-		return "", fmt.Errorf("destination path %q is not a directory", destDir)
+	if len(paths) != 1 {
+		return "", fmt.Errorf("expected a single file, got %d", len(paths))
+	}
+	return paths[0], nil
+}
+
+// ReceiveFiles reads one transport negotiation, then one batch until MsgTypeSessionEnd (or clean disconnect), then tears down the negotiated transport.
+// receiveSessionCleanup runs after all files have been drained; negotiationStop must run before PeerClose when both are set (tear down the WS signalling reader before closing the RTC peer).
+type receiveSessionCleanup struct {
+	NegotiationStop func()
+	PeerClose       func()
+}
+
+// receiveBatch reads files until MsgTypeSessionEnd or until the sender disconnects cleanly.
+// If sessionStillOpen is true, the sender sent SessionEnd and may send another batch on the same transport.
+// When allowIdleBetweenBatches is true, a clean read error or SessionEnd before the first Metadata of this batch ends the batch with zero paths (used after the opening batch in ReceiveBatches).
+func (r *Receiver) receiveBatch(read msgReader, destDir string, progressFn func(fileIndex int, received, total int64), primed *Message, allowIdleBetweenBatches bool) (paths []string, sessionStillOpen bool, err error) {
+	nextPrimed := primed
+
+	if nextPrimed == nil && allowIdleBetweenBatches {
+		first, err := read()
+		if isSessionEndReadErr(err) {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, fmt.Errorf("read message: %w", err)
+		}
+		switch first.Type {
+		case MsgTypeMetadata:
+			nextPrimed = &first
+		case MsgTypeSessionEnd:
+			return nil, false, nil
+		default:
+			return nil, false, fmt.Errorf("unexpected message while waiting for next batch (%#x)", first.Type)
+		}
 	}
 
+	var fileIdx int
+	for {
+		wrapProgress := func(received, total int64) {
+			if progressFn != nil {
+				progressFn(fileIdx, received, total)
+			}
+		}
+		path, rerr := r.recvFile(read, destDir, wrapProgress, nextPrimed)
+		nextPrimed = nil
+		if rerr != nil {
+			return paths, false, rerr
+		}
+		paths = append(paths, path)
+		fileIdx++
+
+		msg, peekErr := read()
+		if peekErr != nil {
+			if len(paths) > 0 && isSessionEndReadErr(peekErr) {
+				return paths, false, nil
+			}
+			if len(paths) == 0 && isSessionEndReadErr(peekErr) {
+				return nil, false, fmt.Errorf("connection closed before any file was received")
+			}
+			return paths, false, fmt.Errorf("read message: %w", peekErr)
+		}
+		switch msg.Type {
+		case MsgTypeSessionEnd:
+			return paths, true, nil
+		case MsgTypeMetadata:
+			nextPrimed = &msg
+		default:
+			return paths, false, fmt.Errorf("unexpected message after file (%#x)", msg.Type)
+		}
+	}
+}
+
+func (r *Receiver) ReceiveFiles(destDir string, progressFn func(fileIndex int, received, total int64)) ([]string, error) {
+	info, err := os.Stat(destDir)
+	if err != nil {
+		return nil, fmt.Errorf("destination directory %q does not exist: %w", destDir, err)
+	}
+	if !info.IsDir() {
+		return nil, fmt.Errorf("destination path %q is not a directory", destDir)
+	}
+
+	read, sessCleanup, primed, err := r.openReceiveSession()
+	defer func() {
+		if sessCleanup.NegotiationStop != nil {
+			sessCleanup.NegotiationStop()
+		}
+		if sessCleanup.PeerClose != nil {
+			sessCleanup.PeerClose()
+		}
+	}()
+	if err != nil {
+		return nil, err
+	}
+
+	paths, _, err := r.receiveBatch(read, destDir, progressFn, primed, false)
+	return paths, err
+}
+
+// ReceiveBatches negotiates once, then receives zero or more batches until the sender closes the connection.
+// The progressFn fileIndex restarts at 0 for each batch. onBatch is invoked after each MsgTypeSessionEnd (or after a clean disconnect that ended a batch).
+func (r *Receiver) ReceiveBatches(destDir string, onBatch func(batchIndex int, paths []string) error, progressFn func(fileIndex int, received, total int64)) error {
+	info, err := os.Stat(destDir)
+	if err != nil {
+		return fmt.Errorf("destination directory %q does not exist: %w", destDir, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("destination path %q is not a directory", destDir)
+	}
+
+	read, sessCleanup, primed, err := r.openReceiveSession()
+	defer func() {
+		if sessCleanup.NegotiationStop != nil {
+			sessCleanup.NegotiationStop()
+		}
+		if sessCleanup.PeerClose != nil {
+			sessCleanup.PeerClose()
+		}
+	}()
+	if err != nil {
+		return err
+	}
+
+	batchIdx := 0
+	nextPrimed := primed
+	for {
+		paths, sessionOpen, rerr := r.receiveBatch(read, destDir, progressFn, nextPrimed, batchIdx > 0)
+		nextPrimed = nil
+		if rerr != nil {
+			return rerr
+		}
+		if len(paths) == 0 {
+			return nil
+		}
+		if err := onBatch(batchIdx, paths); err != nil {
+			return err
+		}
+		batchIdx++
+		if !sessionOpen {
+			return nil
+		}
+	}
+}
+
+func isSessionEndReadErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) {
+		return true
+	}
+	if websocket.IsUnexpectedCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+		return true
+	}
+	if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseNoStatusReceived, websocket.CloseAbnormalClosure) {
+		return true
+	}
+	if errors.Is(err, net.ErrClosed) {
+		return true
+	}
+	return false
+}
+
+func (r *Receiver) openReceiveSession() (read msgReader, cleanup receiveSessionCleanup, primed *Message, err error) {
 	r.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	first, err := readSignalMsg(r.conn, r.key)
 	if err != nil {
-		return "", fmt.Errorf("read first message: %w", err)
+		return nil, cleanup, nil, fmt.Errorf("read first message: %w", err)
 	}
 	r.conn.SetReadDeadline(time.Time{})
 
 	switch first.Type {
 	case MsgTypeSDPOffer:
-		peer, tail, stop, err := negotiateReceiver(context.Background(), r.conn, r.key, string(first.Payload))
-		if err != nil {
-			if errors.Is(err, ErrPeerP2PFail) {
-				defer stop()
-				return r.recvFile(tail, destDir, progressFn, nil)
+		peer, tail, stop, nerr := negotiateReceiver(context.Background(), r.conn, r.key, string(first.Payload))
+		if nerr != nil {
+			if errors.Is(nerr, ErrPeerP2PFail) {
+				cleanup.NegotiationStop = stop
+				return tail, cleanup, nil, nil
 			}
-			return "", fmt.Errorf("p2p negotiation: %w", err)
+			return nil, cleanup, nil, fmt.Errorf("p2p negotiation: %w", nerr)
 		}
-		defer peer.Close()
-		return r.recvFile(r.peerReader(peer), destDir, progressFn, nil)
+		cleanup.PeerClose = func() { peer.Close() }
+		return r.peerReader(peer), cleanup, nil, nil
 
 	case MsgTypeP2PFail:
-		return r.recvFile(r.wsReader(), destDir, progressFn, nil)
+		return r.wsReader(), cleanup, nil, nil
 
 	case MsgTypeMetadata, MsgTypeChunk, MsgTypeComplete, MsgTypeError:
-		return r.recvFile(r.wsReader(), destDir, progressFn, &first)
+		return r.wsReader(), cleanup, &first, nil
 
 	default:
-		return "", fmt.Errorf("unexpected first message type: %#x", first.Type)
+		return nil, cleanup, nil, fmt.Errorf("unexpected first message type: %#x", first.Type)
 	}
 }
-
-type msgReader func() (Message, error)
 
 func (r *Receiver) wsReader() msgReader {
 	return func() (Message, error) {
@@ -236,6 +401,8 @@ func (r *Receiver) recvFile(read msgReader, destDir string, progressFn func(rece
 			return destPath, true, nil
 		case MsgTypeError:
 			return "", false, fmt.Errorf("sender error: %s", string(msg.Payload))
+		case MsgTypeSessionEnd:
+			return "", false, fmt.Errorf("session end before file finished")
 		}
 		return "", false, nil
 	}

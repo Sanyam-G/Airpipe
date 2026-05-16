@@ -28,14 +28,14 @@
   </section>
 
   <section id="select" class="block hidden">
-    <h2>Drop a file</h2>
-    <p class="block-sub">It encrypts in your browser before any bytes leave. The relay only ever sees ciphertext.</p>
+    <h2>Drop file(s)</h2>
+    <p class="block-sub">It encrypts in your browser before any bytes leave. The relay only ever sees ciphertext. Multiple files send in one connection.</p>
     <div class="drop-zone" id="dropzone">
       <div class="drop-icon">+</div>
-      <div class="drop-label">tap to select or <strong>drop a file</strong></div>
+      <div class="drop-label">tap to select or <strong>drop files</strong></div>
       <div class="drop-hint">any type · any size</div>
     </div>
-    <input type="file" id="fileinput">
+    <input type="file" id="fileinput" multiple>
   </section>
 
   <section id="preparing" class="block hidden">
@@ -94,6 +94,7 @@ const MSG_METADATA=0x01, MSG_READY=0x02, MSG_COMPLETE=0x03, MSG_ERROR=0x04;
 const MSG_CHUNK=0x10, MSG_VERSION=0x20;
 const MSG_SDP_OFFER=0x30, MSG_SDP_ANSWER=0x31, MSG_ICE_CANDIDATE=0x32;
 const MSG_P2P_READY=0x33, MSG_P2P_FAIL=0x34;
+const MSG_SESSION_END=0x36;
 
 const ICE_SERVERS=[
   {urls:'stun:stun.l.google.com:19302'},
@@ -193,22 +194,21 @@ ws.onclose=()=>{
 const dropzone=$('dropzone');
 const fileinput=$('fileinput');
 dropzone.addEventListener('click',()=>fileinput.click());
-fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFile(e.target.files[0])});
+fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFiles(e.target.files)});
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop',(e)=>{
   e.preventDefault();
   dropzone.classList.remove('dragover');
-  if(e.dataTransfer.files.length)sendFile(e.dataTransfer.files[0]);
+  if(e.dataTransfer.files.length)sendFiles(e.dataTransfer.files);
 });
 
-async function sendFile(file){
-  $('filename').textContent=file.name;
-  $('send-size').textContent=formatSize(file.size);
-  $('prep-name').textContent=file.name;
+async function sendFiles(fileList){
+  const files=[...fileList];
+  if(!files.length)return;
+  $('prep-name').textContent=files.length===1?files[0].name:(files.length+' files');
 
   try{
-    // Immediate UI feedback: switch to preparing state so user sees something is happening.
     phase='preparing';
     show('preparing');
 
@@ -228,20 +228,34 @@ async function sendFile(file){
 
     phase='sending';
     show('sending');
+    const sendFn=usingP2P?sendDC:sendWS;
     if(usingP2P){
       $('transport').textContent='direct · WebRTC DataChannel';
       ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
-      await streamFile(file,sendDC);
-      while(dc.bufferedAmount>0){await sleep(10)}
     }else{
       $('transport').textContent='via relay · P2P unavailable';
       ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
-      await streamFile(file,sendWS);
     }
 
+    let totalSent=0;
+    for(let i=0;i<files.length;i++){
+      const file=files[i];
+      const label=files.length>1?'('+String(i+1)+'/'+String(files.length)+') ':'';
+      $('filename').textContent=label+file.name;
+      $('send-size').textContent=formatSize(file.size);
+      $('progress').style.width='0%';
+      $('ptext').textContent='0%';
+      await streamFile(file,sendFn);
+      totalSent+=file.size;
+    }
+    if(usingP2P){
+      while(dc.bufferedAmount>0){await sleep(10)}
+    }
+    await sendFn(encode(MSG_SESSION_END,new Uint8Array(0)));
+
     phase='complete';
-    $('done-name').textContent=file.name;
-    $('done-size').textContent=formatSize(file.size);
+    $('done-name').textContent=files.length===1?files[0].name:(String(files.length)+' files');
+    $('done-size').textContent=formatSize(totalSent);
     $('done-transport').textContent=usingP2P?'direct · WebRTC':'via relay';
     show('complete');
   }catch(err){

@@ -52,6 +52,7 @@
     <div class="transport" id="transport"></div>
     <div class="filename" id="recv-filename">-</div>
     <div class="size-info" id="recv-size"></div>
+    <p class="block-sub" id="recv-session-hint" style="opacity:0.72;font-size:0.88rem"></p>
     <div class="progress-wrap">
       <div class="progress-bar"><div class="progress-fill" id="live-progress"></div></div>
       <div class="progress-text" id="live-ptext">0%</div>
@@ -59,13 +60,24 @@
     <div class="speed-info" id="speed"></div>
   </section>
 
+  <section id="ready-more" class="block hidden">
+    <div class="checkmark">✓</div>
+    <h2 style="color:var(--accent)">Batch complete</h2>
+    <div class="transport" id="paused-transport"></div>
+    <div class="filename" id="paused-name">-</div>
+    <div class="size-info" id="paused-size"></div>
+    <p class="block-sub" id="paused-total-session" style="opacity:0.75;font-size:0.88rem"></p>
+    <p class="block-sub">Stay on this page to receive another batch from the sender.</p>
+    <div class="dots"><span></span><span></span><span></span></div>
+  </section>
+
   <section id="complete" class="block hidden">
     <div class="checkmark">✓</div>
-    <h2 style="color:var(--accent)">Transfer complete</h2>
+    <h2 style="color:var(--accent)">Session ended</h2>
     <div class="transport" id="done-transport"></div>
     <div class="filename" id="fname">-</div>
     <div class="size-info" id="file-size">-</div>
-    <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked it. Reload to try again.</p>
+    <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked multiple downloads. Allow pop-ups for this site or check your downloads folder.</p>
   </section>
 
   <section id="error" class="block hidden">
@@ -90,6 +102,7 @@ const MSG_METADATA = 0x01, MSG_READY = 0x02, MSG_COMPLETE = 0x03, MSG_ERROR = 0x
 const MSG_CHUNK = 0x10;
 const MSG_SDP_OFFER = 0x30, MSG_SDP_ANSWER = 0x31, MSG_ICE_CANDIDATE = 0x32;
 const MSG_P2P_READY = 0x33, MSG_P2P_FAIL = 0x34, MSG_PEER_JOIN = 0x35;
+const MSG_SESSION_END = 0x36;
 
 const ICE_SERVERS = [
   { urls: 'stun:stun.l.google.com:19302' },
@@ -110,7 +123,7 @@ try {
 function $(id) { return document.getElementById(id) }
 
 function show(id) {
-  ['lookup', 'loading', 'waiting', 'negotiating', 'receiving', 'complete', 'error'].forEach(x => $(x).classList.add('hidden'));
+  ['lookup', 'loading', 'waiting', 'negotiating', 'receiving', 'ready-more', 'complete', 'error'].forEach(x => $(x).classList.add('hidden'));
   $(id).classList.remove('hidden');
 }
 
@@ -147,6 +160,42 @@ function decrypt(data, k) {
   const nonce = data.slice(0, 24);
   const ct = data.slice(24);
   return nacl.secretbox.open(ct, nonce, k);
+}
+
+const MAILBOX_MAX_FILES_DECODE = 256;
+
+function decodeMailboxAMB2(rest) {
+  if (rest.length < 4) throw new Error('invalid bundle');
+  const v = new DataView(rest.buffer, rest.byteOffset, rest.byteLength);
+  let o = 0;
+  const n = v.getUint32(o); o += 4;
+  if (n < 1 || n > MAILBOX_MAX_FILES_DECODE) throw new Error('invalid bundle');
+  const out = [];
+  const td = new TextDecoder();
+  for (let i = 0; i < n; i++) {
+    if (o + 4 > rest.length) throw new Error('invalid bundle');
+    const fnLen = v.getUint32(o); o += 4;
+    if (fnLen < 1 || o + fnLen + 8 > rest.length) throw new Error('invalid bundle');
+    const name = td.decode(rest.subarray(o, o + fnLen)); o += fnLen;
+    const sz = Number(v.getBigUint64(o)); o += 8;
+    if (!Number.isFinite(sz) || sz < 0 || o + sz > rest.length) throw new Error('invalid bundle');
+    out.push({ name, content: rest.slice(o, o + sz) });
+    o += sz;
+  }
+  if (o !== rest.byteLength) throw new Error('invalid bundle');
+  return out;
+}
+
+function decodeMailboxEntries(decrypted) {
+  const head = String.fromCharCode(decrypted[0], decrypted[1], decrypted[2], decrypted[3]);
+  if (head === 'AMB2') {
+    return decodeMailboxAMB2(decrypted.slice(4));
+  }
+  const fnLen = (decrypted[0] << 24) | (decrypted[1] << 16) | (decrypted[2] << 8) | decrypted[3];
+  if (fnLen <= 0 || 4 + fnLen > decrypted.length) throw new Error('invalid payload');
+  const name = new TextDecoder().decode(decrypted.slice(4, 4 + fnLen));
+  const content = decrypted.slice(4 + fnLen);
+  return [{ name, content }];
 }
 function encode(type, payload) {
   const r = new Uint8Array(5 + payload.length);
@@ -239,20 +288,36 @@ async function runMailbox() {
 
     $('progress').style.width = '100%';
 
-    const fnLen = (decrypted[0] << 24) | (decrypted[1] << 16) | (decrypted[2] << 8) | decrypted[3];
-    const filename = new TextDecoder().decode(decrypted.slice(4, 4 + fnLen));
-    const content = decrypted.slice(4 + fnLen);
+    let entries;
+    try {
+      entries = decodeMailboxEntries(decrypted);
+    } catch (err) {
+      showError(err.message ? ('Invalid mailbox data: ' + err.message) : 'Invalid mailbox data');
+      return;
+    }
 
-    $('fname').textContent = filename;
-    $('file-size').textContent = formatSize(content.length);
+    if (entries.length === 1) {
+      $('fname').textContent = entries[0].name;
+      $('file-size').textContent = formatSize(entries[0].content.length);
+    } else {
+      const totalSz = entries.reduce((s, e) => s + e.content.byteLength, 0);
+      $('fname').textContent = String(entries.length) + ' files';
+      $('file-size').textContent = formatSize(totalSz) + ' total';
+    }
     $('done-transport').textContent = 'mailbox · async';
     show('complete');
 
-    const blob = new Blob([content]);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = filename;
-    a.click();
+    entries.forEach((ent, idx) => {
+      setTimeout(() => {
+        const blob = new Blob([ent.content]);
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = ent.name;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }, idx * 150);
+    });
   } catch (e) {
     showError(e.message || 'Download failed');
   }
@@ -267,6 +332,13 @@ let bytesReceived = 0;
 let receivedChunks = [];
 let startTime = 0;
 let lastUIUpdate = 0;
+let filesReceived = 0;
+let lastSavedName = '';
+let lastSavedSize = 0;
+let totalSavedBytes = 0;
+let sessionFinalized = false;
+let filesThisBatch = 0;
+let batchBytesSent = 0;
 
 function runLive() {
   phase = 'waiting';
@@ -285,6 +357,20 @@ function runLive() {
   };
 
   ws.onclose = () => {
+    if (phase === 'complete' || phase === 'error') return;
+    if (sessionFinalized) return;
+    if (phase === 'readyMore') {
+      finalizeSessionTotals();
+      return;
+    }
+    if (transport === 'ws' && phase === 'receiving' && metadata !== null) {
+      showError('Relay connection closed during transfer.');
+      return;
+    }
+    if (transport === 'ws' && filesReceived > 0) {
+      finalizeSessionTotals();
+      return;
+    }
     if (phase === 'negotiating' || phase === 'receiving') {
       showError('Connection closed during ' + phase + '. Sender may have disconnected.');
     }
@@ -317,7 +403,13 @@ function runLive() {
     }
     if (msg.type === MSG_P2P_FAIL) {
       transport = 'ws';
-      if (pc) { try { pc.close() } catch (_) { } pc = null; dc = null }
+      if (pc) {
+        pc.onconnectionstatechange = null;
+        dc.onclose = null;
+        try { pc.close(); } catch (_) { }
+        pc = null;
+        dc = null;
+      }
       phase = 'receiving';
       show('receiving');
       $('transport').textContent = 'via relay · P2P unavailable';
@@ -362,6 +454,25 @@ async function answerOffer(offerSDP) {
     startTime = performance.now();
   };
 
+  dc.onclose = () => {
+    if (phase === 'complete' || phase === 'error' || sessionFinalized) return;
+    if (phase === 'readyMore') {
+      finalizeSessionTotals();
+      return;
+    }
+    if (phase === 'receiving' && metadata !== null) {
+      showError('Peer connection closed during transfer.');
+      return;
+    }
+    if (filesReceived > 0) {
+      finalizeSessionTotals();
+      return;
+    }
+    if (phase === 'receiving') {
+      showError('Peer connection closed before transfer finished.');
+    }
+  };
+
   dc.onmessage = (evt) => {
     const enc = new Uint8Array(evt.data);
     const dec = decrypt(enc, key);
@@ -385,8 +496,19 @@ function handleDataMessage(msg) {
       showError('Bad metadata from sender');
       return;
     }
+    if (phase === 'readyMore') {
+      phase = 'receiving';
+      show('receiving');
+    }
+    receivedChunks = [];
+    bytesReceived = 0;
+    lastUIUpdate = 0;
+    startTime = performance.now();
     $('recv-filename').textContent = metadata.filename;
     $('recv-size').textContent = formatSize(metadata.size);
+    $('live-progress').style.width = '0%';
+    $('live-ptext').textContent = '0%';
+    $('speed').textContent = '';
     return;
   }
   if (msg.type === MSG_CHUNK) {
@@ -408,7 +530,11 @@ function handleDataMessage(msg) {
     return;
   }
   if (msg.type === MSG_COMPLETE) {
-    finishTransfer();
+    finishOneFile();
+    return;
+  }
+  if (msg.type === MSG_SESSION_END) {
+    pauseBetweenBatches();
     return;
   }
   if (msg.type === MSG_ERROR) {
@@ -417,25 +543,55 @@ function handleDataMessage(msg) {
   }
 }
 
-function finishTransfer() {
+function finishOneFile() {
   if (!metadata) {
     showError('Transfer ended without metadata');
     return;
   }
   const blob = new Blob(receivedChunks);
   receivedChunks = [];
+  const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = url;
   a.download = metadata.filename;
   a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  lastSavedName = metadata.filename;
+  lastSavedSize = metadata.size;
+  totalSavedBytes += metadata.size;
+  batchBytesSent += metadata.size;
+  filesReceived++;
+  filesThisBatch++;
+  metadata = null;
+  bytesReceived = 0;
+  lastUIUpdate = 0;
+  $('live-progress').style.width = '0%';
+  $('live-ptext').textContent = '0%';
+  $('speed').textContent = '';
+  const hint = $('recv-session-hint');
+  if (hint) hint.textContent = filesReceived >= 1 ? (filesReceived === 1 ? '1 file saved this session' : `${filesReceived} files saved this session`) : '';
+}
 
+function pauseBetweenBatches() {
+  phase = 'readyMore';
+  $('paused-name').textContent = filesThisBatch <= 1 ? lastSavedName : (String(filesThisBatch) + ' files');
+  $('paused-size').textContent = filesThisBatch <= 1 ? formatSize(lastSavedSize) : (formatSize(batchBytesSent) + ' total');
+  $('paused-transport').textContent = transport === 'p2p' ? 'direct · WebRTC' : 'via relay';
+  const pt = $('paused-total-session');
+  if (pt) pt.textContent = filesReceived > 0 ? `${filesReceived} saved this session (${formatSize(totalSavedBytes)})` : '';
+  filesThisBatch = 0;
+  batchBytesSent = 0;
+  show('ready-more');
+}
+
+function finalizeSessionTotals() {
+  if (sessionFinalized) return;
+  sessionFinalized = true;
   phase = 'complete';
-  $('fname').textContent = metadata.filename;
-  $('file-size').textContent = formatSize(metadata.size);
+  $('fname').textContent = filesReceived <= 1 ? lastSavedName : (String(filesReceived) + ' files');
+  $('file-size').textContent = filesReceived <= 1 ? formatSize(lastSavedSize) : (formatSize(totalSavedBytes) + ' total');
   $('done-transport').textContent = transport === 'p2p' ? 'direct · WebRTC' : 'via relay';
   show('complete');
-
-  try { ws.close() } catch (_) { }
 }
 
 </script>
