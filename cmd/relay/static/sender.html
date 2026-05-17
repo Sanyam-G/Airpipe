@@ -63,6 +63,18 @@
     <div class="speed-info" id="speed"></div>
   </section>
 
+  <section id="batch-done" class="block hidden">
+    <div class="checkmark">✓</div>
+    <h2 style="color:var(--accent)">Batch sent</h2>
+    <div class="transport" id="batch-done-transport"></div>
+    <div class="filename" id="batch-done-name">-</div>
+    <div class="size-info" id="batch-done-size"></div>
+    <p class="block-sub">Same secure link — send another batch whenever you’re ready.</p>
+    <div class="batch-actions">
+      <button type="button" class="cta cta-primary" id="send-more-btn">Send more files</button>
+    </div>
+  </section>
+
   <section id="complete" class="block hidden">
     <div class="checkmark">✓</div>
     <h2 style="color:var(--accent)">Transfer complete</h2>
@@ -144,6 +156,8 @@ function awaitMsg(type,timeoutMs){
 
 let pc=null,dc=null;
 let phase='connecting';
+let transportReady=false;
+let usingP2PMedia=false;
 
 ws.onmessage=async(evt)=>{
   const enc=new Uint8Array(evt.data);
@@ -185,7 +199,9 @@ ws.onerror=()=>{
   showError('Connection lost. Reload to retry.');
 };
 ws.onclose=()=>{
-  // Show error if we're past select but not yet complete (negotiating/sending mid-flight).
+  if(phase==='batch-done'){
+    return;
+  }
   if(phase!=='connecting'&&phase!=='select'&&phase!=='complete'){
     showError('Connection closed during transfer ('+phase+')');
   }
@@ -195,6 +211,11 @@ const dropzone=$('dropzone');
 const fileinput=$('fileinput');
 dropzone.addEventListener('click',()=>fileinput.click());
 fileinput.addEventListener('change',(e)=>{if(e.target.files.length)sendFiles(e.target.files)});
+$('send-more-btn').addEventListener('click',()=>{
+  phase='select';
+  show('select');
+  fileinput.value='';
+});
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop',(e)=>{
@@ -209,34 +230,41 @@ async function sendFiles(fileList){
   $('prep-name').textContent=files.length===1?files[0].name:(files.length+' files');
 
   try{
-    phase='preparing';
-    show('preparing');
+    if(!transportReady){
+      phase='preparing';
+      show('preparing');
 
-    ws.send(encrypt(encode(MSG_VERSION,new Uint8Array([PROTOCOL_VERSION])),keyBytes));
-    await awaitMsg(MSG_READY,30000);
+      ws.send(encrypt(encode(MSG_VERSION,new Uint8Array([PROTOCOL_VERSION])),keyBytes));
+      await awaitMsg(MSG_READY,30000);
 
-    phase='negotiating';
-    show('negotiating');
-    let usingP2P=false;
-    try{
-      await negotiateP2P();
-      usingP2P=true;
-    }catch(e){
-      console.warn('p2p negotiation failed, falling back to relay:',e);
-      if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
-    }
+      phase='negotiating';
+      show('negotiating');
+      try{
+        await negotiateP2P();
+        usingP2PMedia=true;
+      }catch(e){
+        console.warn('p2p negotiation failed, falling back to relay:',e);
+        usingP2PMedia=false;
+        if(pc){try{pc.close()}catch(_){}pc=null;dc=null}
+      }
 
-    phase='sending';
-    show('sending');
-    const sendFn=usingP2P?sendDC:sendWS;
-    if(usingP2P){
-      $('transport').textContent='direct · WebRTC DataChannel';
-      ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
+      phase='sending';
+      show('sending');
+      if(usingP2PMedia){
+        $('transport').textContent='direct · WebRTC DataChannel';
+        ws.send(encrypt(encode(MSG_P2P_READY,new Uint8Array(0)),keyBytes));
+      }else{
+        $('transport').textContent='via relay · P2P unavailable';
+        ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
+      }
+      transportReady=true;
     }else{
-      $('transport').textContent='via relay · P2P unavailable';
-      ws.send(encrypt(encode(MSG_P2P_FAIL,new TextEncoder().encode('browser p2p failed')),keyBytes));
+      phase='sending';
+      show('sending');
+      $('transport').textContent=usingP2PMedia?'direct · WebRTC DataChannel':'via relay · P2P unavailable';
     }
 
+    const sendFn=usingP2PMedia?sendDC:sendWS;
     let totalSent=0;
     for(let i=0;i<files.length;i++){
       const file=files[i];
@@ -248,16 +276,16 @@ async function sendFiles(fileList){
       await streamFile(file,sendFn);
       totalSent+=file.size;
     }
-    if(usingP2P){
+    if(usingP2PMedia){
       while(dc.bufferedAmount>0){await sleep(10)}
     }
     await sendFn(encode(MSG_SESSION_END,new Uint8Array(0)));
 
-    phase='complete';
-    $('done-name').textContent=files.length===1?files[0].name:(String(files.length)+' files');
-    $('done-size').textContent=formatSize(totalSent);
-    $('done-transport').textContent=usingP2P?'direct · WebRTC':'via relay';
-    show('complete');
+    phase='batch-done';
+    $('batch-done-name').textContent=files.length===1?files[0].name:(String(files.length)+' files');
+    $('batch-done-size').textContent=formatSize(totalSent);
+    $('batch-done-transport').textContent=usingP2PMedia?'direct · WebRTC':'via relay';
+    show('batch-done');
   }catch(err){
     showError(err.message||String(err));
   }
@@ -330,7 +358,7 @@ function sendWS(plaintext){
 function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
 function show(id){
-  ['connecting','select','preparing','negotiating','sending','complete','error'].forEach(x=>$(x).classList.add('hidden'));
+  ['connecting','select','preparing','negotiating','sending','batch-done','complete','error'].forEach(x=>$(x).classList.add('hidden'));
   $(id).classList.remove('hidden');
 }
 
