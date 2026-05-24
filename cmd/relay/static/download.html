@@ -405,7 +405,7 @@ function runLive() {
       transport = 'ws';
       if (pc) {
         pc.onconnectionstatechange = null;
-        dc.onclose = null;
+        if (dc) dc.onclose = null;
         try { pc.close(); } catch (_) { }
         pc = null;
         dc = null;
