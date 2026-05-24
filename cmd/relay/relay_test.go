@@ -119,19 +119,19 @@ func TestRoomCleanup(t *testing.T) {
 	rm := &RoomManager{rooms: make(map[string]*Room), log: newTestLogger()}
 
 	rm.rooms["old"] = &Room{
-		token:     "old",
-		clients:   nil,
-		createdAt: time.Now().Add(-15 * time.Minute),
+		token:        "old",
+		clients:      nil,
+		lastActivity: time.Now().Add(-15 * time.Minute),
 	}
 	rm.rooms["new"] = &Room{
-		token:     "new",
-		clients:   nil,
-		createdAt: time.Now(),
+		token:        "new",
+		clients:      nil,
+		lastActivity: time.Now(),
 	}
 
 	rm.mu.Lock()
 	for token, room := range rm.rooms {
-		if time.Since(room.createdAt) > 10*time.Minute {
+		if time.Since(room.lastActivity) > 10*time.Minute {
 			delete(rm.rooms, token)
 		}
 	}
@@ -144,6 +144,14 @@ func TestRoomCleanup(t *testing.T) {
 	}
 	if _, exists := rm.rooms["new"]; !exists {
 		t.Fatal("fresh room should still exist")
+	}
+}
+
+func TestRoomLastActivityRefresh(t *testing.T) {
+	room := &Room{token: "t", clients: nil, lastActivity: time.Now().Add(-20 * time.Minute)}
+	room.Broadcast(nil, []byte{})
+	if time.Since(room.lastActivity) > time.Second {
+		t.Fatalf("Broadcast did not refresh lastActivity: idle=%s", time.Since(room.lastActivity))
 	}
 }
 
