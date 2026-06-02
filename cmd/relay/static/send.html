@@ -83,6 +83,8 @@
 <script src="/static/nacl-fast.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="/static/words.js"></script>
+<script src="/static/airpipe-protocol.js"></script>
+<script src="/static/airpipe-mailbox.js"></script>
 <script>
 if(!window.isSecureContext){
   const w=document.createElement('div');
@@ -119,13 +121,6 @@ function b64encode(bytes){
   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
 }
 
-function formatSize(bytes){
-  if(bytes===0)return '0 B';
-  const units=['B','KB','MB','GB'];
-  const i=Math.floor(Math.log(bytes)/Math.log(1024));
-  return (bytes/Math.pow(1024,i)).toFixed(i===0?0:1)+' '+units[i];
-}
-
 let shareURL='';
 let currentPhrase='';
 
@@ -159,48 +154,6 @@ function hexEncode(bytes){
   return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-
-const MAILBOX_MAX_FILES=256;
-const MAILBOX_MAX_NAME=4095;
-const MAILBOX_CAP=500<<20;// 500 MiB — aligns with relay cap
-
-async function mailboxEncodeAMB2(fileListArr){
-  if(fileListArr.length<2)return null;
-  if(fileListArr.length>MAILBOX_MAX_FILES)throw new Error('Too many files (max '+MAILBOX_MAX_FILES+')');
-  const te=new TextEncoder();
-  const dataArr=[];
-  let combined=0;
-  const names=[];
-  for(const f of fileListArr){
-    const nb=te.encode(f.name||'file');
-    if(nb.length<1||nb.length>MAILBOX_MAX_NAME)throw new Error('Invalid filename: '+(f.name||'?'));
-    const raw=new Uint8Array(await f.arrayBuffer());
-    if(raw.byteLength>MAILBOX_CAP)throw new Error('File too large: '+f.name);
-    combined+=raw.byteLength;
-    if(combined>MAILBOX_CAP)throw new Error('Combined size exceeds 500 MB');
-    names.push(nb);
-    dataArr.push(raw);
-  }
-  let off=8;
-  let total=off;
-  for(let i=0;i<fileListArr.length;i++){
-    total+=4+names[i].length+8+dataArr[i].length;
-  }
-  const payload=new Uint8Array(total);
-  payload[0]=0x41;payload[1]=0x4D;payload[2]=0x42;payload[3]=0x32;
-  const dv=new DataView(payload.buffer);
-  dv.setUint32(4,fileListArr.length);
-  off=8;
-  for(let i=0;i<fileListArr.length;i++){
-    const nb=names[i];
-    dv.setUint32(off,nb.length);off+=4;
-    payload.set(nb,off);off+=nb.length;
-    dv.setBigUint64(off,BigInt(dataArr[i].length));off+=8;
-    payload.set(dataArr[i],off);off+=dataArr[i].length;
-  }
-  return payload;
-}
-
 async function handleFiles(filesIn){
   const fileListArr=Array.from(filesIn||[]);
   if(!fileListArr.length)return;
@@ -219,24 +172,19 @@ async function handleFiles(filesIn){
     if(fileListArr.length===1){
       const file=fileListArr[0];
       document.getElementById('enc-name').textContent=file.name;
-      const arrayBuf=await file.arrayBuffer();
-      const fileBytes=new Uint8Array(arrayBuf);
+      const content=new Uint8Array(await file.arrayBuffer());
       document.getElementById('enc-progress').style.width='30%';
       document.getElementById('enc-text').textContent='building payload…';
-      const fnBytes=new TextEncoder().encode(file.name);
-      const fnLen=fnBytes.length;
-      payload=new Uint8Array(4+fnLen+fileBytes.length);
-      payload[0]=(fnLen>>24)&0xff;
-      payload[1]=(fnLen>>16)&0xff;
-      payload[2]=(fnLen>>8)&0xff;
-      payload[3]=fnLen&0xff;
-      payload.set(fnBytes,4);
-      payload.set(fileBytes,4+fnLen);
+      payload=encodeMailboxV1(file.name,content);
     }else{
       document.getElementById('enc-name').textContent=fileListArr.length+' files';
       document.getElementById('enc-progress').style.width='25%';
       document.getElementById('enc-text').textContent='reading files…';
-      payload=await mailboxEncodeAMB2(fileListArr);
+      const entries=[];
+      for(const f of fileListArr){
+        entries.push({name:f.name||'file',content:new Uint8Array(await f.arrayBuffer())});
+      }
+      payload=encodeMailboxAMB2(entries);
       document.getElementById('enc-progress').style.width='40%';
       document.getElementById('enc-text').textContent='building bundle…';
     }
