@@ -26,8 +26,8 @@ var ErrInvalidPayload = errors.New("mailbox: invalid decrypted payload")
 // EncodeV1 is the legacy mailbox layout: fnLen BE32 | UTF-8 name | raw contents.
 func EncodeV1(filename string, content []byte) ([]byte, error) {
 	fn := []byte(filename)
-	if len(fn) > MaxFilenameLen {
-		return nil, fmt.Errorf("mailbox: filename too long (%d)", len(fn))
+	if len(fn) < 1 || len(fn) > MaxFilenameLen {
+		return nil, fmt.Errorf("mailbox: invalid filename %q", filename)
 	}
 	if int64(len(content)) > MaxFilePayload {
 		return nil, fmt.Errorf("mailbox: file too large")
@@ -57,8 +57,8 @@ func EncodeAMB2(entries []Entry) ([]byte, error) {
 	var totalPayload int64
 	for _, e := range entries {
 		fn := []byte(e.Name)
-		if len(fn) > MaxFilenameLen {
-			return nil, fmt.Errorf("mailbox: filename too long in %q", e.Name)
+		if len(fn) < 1 || len(fn) > MaxFilenameLen {
+			return nil, fmt.Errorf("mailbox: invalid filename %q", e.Name)
 		}
 		if int64(len(e.Content)) > MaxFilePayload {
 			return nil, fmt.Errorf("mailbox: file too large: %s", e.Name)

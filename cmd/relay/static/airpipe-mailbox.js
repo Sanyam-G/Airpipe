@@ -23,8 +23,8 @@ function encodeMailboxAMB2(entries){
   const names=[];
   let combined=0;
   for(const e of entries){
-    const nb=te.encode(e.name||'file');
-    if(nb.length<1||nb.length>MAILBOX_MAX_NAME)throw new Error('mailbox: invalid filename: '+(e.name||'?'));
+    const nb=te.encode(e.name);
+    if(nb.length<1||nb.length>MAILBOX_MAX_NAME)throw new Error('mailbox: invalid filename: '+JSON.stringify(e.name));
     if(e.content.byteLength>MAILBOX_MAX_PAYLOAD)throw new Error('mailbox: file too large: '+e.name);
     combined+=e.content.byteLength;
     if(combined>MAILBOX_MAX_PAYLOAD)throw new Error('mailbox: combined size too large');

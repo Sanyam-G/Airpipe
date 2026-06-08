@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>airpipe · AMB2 self-check</title>
+<style>
+  body{background:#1B1714;color:#ECE6DC;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:24px;max-width:900px}
+  h1{font-size:18px;font-weight:600;margin:0 0 16px}
+  .row{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid #2A2420}
+  .label{flex:1}
+  .pass{color:#7AC74F}
+  .fail{color:#FF4F00;font-weight:600}
+  .diff{display:block;color:#888;margin:4px 0 0 12px;white-space:pre-wrap;word-break:break-all}
+  .summary{margin-top:24px;padding:12px;border:1px solid #2A2420}
+  .summary.ok{border-color:#7AC74F}
+  .summary.bad{border-color:#FF4F00}
+</style>
+</head>
+<body>
+<h1>AMB2 wire-format self-check</h1>
+<p style="opacity:0.7">Loads airpipe-mailbox.js and asserts encode/decode against the same fixture pinned in <code>internal/mailbox/payload_test.go</code>. Any drift means a sync issue between the Go and JS implementations.</p>
+<div id="results"></div>
+<div id="summary" class="summary"></div>
+
+<script src="/static/airpipe-mailbox.js"></script>
+<script>
+const fixtureV1Hex="0000000968656c6c6f2e747874776f726c64";
+const fixtureV1Name="hello.txt";
+const fixtureV1Content=new TextEncoder().encode("world");
+
+const fixtureAMB2Hex="414d42320000000300000005612e747874000000000000000568656c6c6f00000008646174612e62696e0000000000000004010203ff00000009636166c3a92e747874000000000000000bc3bc6ec4b163c3b664c3a9";
+const fixtureAMB2Entries=[
+  {name:"a.txt",content:new TextEncoder().encode("hello")},
+  {name:"data.bin",content:new Uint8Array([0x01,0x02,0x03,0xff])},
+  {name:"café.txt",content:new TextEncoder().encode("ünıcödé")}
+];
+
+function hexFromBytes(bytes){
+  let s="";
+  for(let i=0;i<bytes.length;i++)s+=bytes[i].toString(16).padStart(2,"0");
+  return s;
+}
+
+function bytesFromHex(s){
+  const out=new Uint8Array(s.length/2);
+  for(let i=0;i<out.length;i++)out[i]=parseInt(s.substr(i*2,2),16);
+  return out;
+}
+
+function bytesEqual(a,b){
+  if(a.length!==b.length)return false;
+  for(let i=0;i<a.length;i++)if(a[i]!==b[i])return false;
+  return true;
+}
+
+const cases=[];
+
+cases.push({name:"EncodeV1 matches fixture",run:()=>{
+  const got=encodeMailboxV1(fixtureV1Name,fixtureV1Content);
+  const gotHex=hexFromBytes(got);
+  if(gotHex!==fixtureV1Hex)return "got "+gotHex;
+  return null;
+}});
+
+cases.push({name:"Decode V1 matches fixture",run:()=>{
+  const entries=decodeMailboxEntries(bytesFromHex(fixtureV1Hex));
+  if(entries.length!==1)return "entries: "+entries.length;
+  if(entries[0].name!==fixtureV1Name)return "name: "+entries[0].name;
+  if(!bytesEqual(entries[0].content,fixtureV1Content))return "content: "+hexFromBytes(entries[0].content);
+  return null;
+}});
+
+cases.push({name:"EncodeAMB2 matches fixture",run:()=>{
+  const got=encodeMailboxAMB2(fixtureAMB2Entries);
+  const gotHex=hexFromBytes(got);
+  if(gotHex!==fixtureAMB2Hex)return "got  "+gotHex+"\nwant "+fixtureAMB2Hex;
+  return null;
+}});
+
+cases.push({name:"Decode AMB2 matches fixture",run:()=>{
+  const entries=decodeMailboxEntries(bytesFromHex(fixtureAMB2Hex));
+  if(entries.length!==fixtureAMB2Entries.length)return "entries: "+entries.length;
+  for(let i=0;i<entries.length;i++){
+    if(entries[i].name!==fixtureAMB2Entries[i].name)return "entry "+i+" name: "+entries[i].name;
+    if(!bytesEqual(entries[i].content,fixtureAMB2Entries[i].content))return "entry "+i+" content: "+hexFromBytes(entries[i].content);
+  }
+  return null;
+}});
+
+cases.push({name:"EncodeAMB2 rejects empty filename",run:()=>{
+  try{
+    encodeMailboxAMB2([{name:"",content:new Uint8Array([1])}]);
+    return "no error thrown";
+  }catch(e){
+    if(!/invalid|filename/i.test(e.message))return "error: "+e.message;
+    return null;
+  }
+}});
+
+const results=document.getElementById("results");
+let pass=0,fail=0;
+for(const c of cases){
+  let err=null;
+  try{err=c.run()}catch(e){err=e.message||String(e)}
+  const row=document.createElement("div");
+  row.className="row";
+  const label=document.createElement("span");
+  label.className="label";
+  label.textContent=c.name;
+  row.appendChild(label);
+  const status=document.createElement("span");
+  if(err===null){status.className="pass";status.textContent="PASS";pass++}
+  else{status.className="fail";status.textContent="FAIL";fail++}
+  row.appendChild(status);
+  results.appendChild(row);
+  if(err!==null){
+    const diff=document.createElement("span");
+    diff.className="diff";
+    diff.textContent=err;
+    results.appendChild(diff);
+  }
+}
+
+const summary=document.getElementById("summary");
+summary.className="summary "+(fail===0?"ok":"bad");
+summary.textContent=pass+" passed, "+fail+" failed";
+</script>
+</body>
+</html>
