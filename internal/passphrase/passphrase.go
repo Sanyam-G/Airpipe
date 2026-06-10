@@ -41,6 +41,13 @@ func DeriveToken(phrase string) string {
 	return hex.EncodeToString(h[:8])
 }
 
+// DeriveReceiveToken returns the room token a receiver waits on. Separate
+// domain from DeriveToken so the landing resolver can route /u/ vs /d/.
+func DeriveReceiveToken(phrase string) string {
+	h := sha256.Sum256([]byte("airpipe:receive-token:" + Normalize(phrase)))
+	return hex.EncodeToString(h[:8])
+}
+
 // DeriveKey returns a 32-byte NaCl secretbox key derived from the passphrase.
 // Uses SHA-256 with a domain-separated prefix.
 func DeriveKey(phrase string) [32]byte {

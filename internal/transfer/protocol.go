@@ -25,9 +25,7 @@ const (
 	MsgTypeSessionEnd   MessageType = 0x36
 )
 
-// v3: multi-file batches + MsgTypeSessionEnd. A v2 receiver exits after the
-// first file's Complete and would silently drop the rest of a batch, so
-// mixed versions must fail closed at the handshake.
+// v3: multi-file batches + SessionEnd. A v2 receiver exits after the first Complete, so mixed versions must fail closed here.
 const ProtocolVersion byte = 3
 
 type Metadata struct {

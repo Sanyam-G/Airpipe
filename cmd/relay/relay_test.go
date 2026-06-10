@@ -373,3 +373,44 @@ func TestRateLimit(t *testing.T) {
 		t.Fatalf("third call should be rate-limited, got %d", code)
 	}
 }
+
+func TestRoomStatusEndpoint(t *testing.T) {
+	s := newTestServer(t)
+	token := "00112233aabbccdd"
+
+	check := func(path string, wantStatus int, wantWaiting bool) {
+		t.Helper()
+		req := httptest.NewRequest("GET", path, nil)
+		req.SetPathValue("token", path[len("/room/"):])
+		w := httptest.NewRecorder()
+		s.handleRoomStatus(w, req)
+		if w.Code != wantStatus {
+			t.Fatalf("%s: status %d, want %d", path, w.Code, wantStatus)
+		}
+		if wantStatus != http.StatusOK {
+			return
+		}
+		var body struct {
+			Waiting bool `json:"waiting"`
+		}
+		if err := json.NewDecoder(w.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.Waiting != wantWaiting {
+			t.Fatalf("%s: waiting %v, want %v", path, body.Waiting, wantWaiting)
+		}
+	}
+
+	check("/room/"+token, http.StatusOK, false)
+
+	room := s.roomManager.GetOrCreateRoom(token)
+	room.AddClient(&websocket.Conn{})
+	check("/room/"+token, http.StatusOK, true)
+
+	room.AddClient(&websocket.Conn{})
+	check("/room/"+token, http.StatusOK, false)
+
+	check("/room/not-a-token", http.StatusBadRequest, false)
+
+	s.roomManager.DeleteRoom(token)
+}

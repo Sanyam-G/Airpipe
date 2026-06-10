@@ -38,9 +38,7 @@ func SafeFilename(raw string) (string, error) {
 
 type msgReader func() (Message, error)
 
-// errSenderRestarted: the sender re-announced its version mid-session (a
-// reloaded browser page restarting its handshake); the receive session must
-// be re-opened from transport negotiation.
+// A reloaded sender re-announces its version mid-session; the receive session must re-open from negotiation.
 var errSenderRestarted = errors.New("sender restarted")
 
 type Receiver struct {
@@ -304,9 +302,7 @@ func (r *Receiver) ReceiveBatches(destDir string, onBatch func(batchIndex int, p
 	}
 }
 
-// reHandshake answers a mid-session version announce. A reloaded web sender
-// rejoins the room and restarts its handshake on the receiver's open socket,
-// so validate the version and re-send Ready to unblock it (#13 reload edge).
+// reHandshake validates a mid-session version announce and re-sends Ready.
 func (r *Receiver) reHandshake(msg Message) error {
 	if len(msg.Payload) == 0 || msg.Payload[0] != ProtocolVersion {
 		got := byte(0)

@@ -193,6 +193,14 @@
     }
     const t = await sha256('airpipe:token:' + p);
     const k = await sha256('airpipe:key:' + p);
+    const rt = await sha256('airpipe:receive-token:' + p);
+    try {
+      const room = await fetch('/room/' + hex(rt.slice(0, 8)));
+      if (room.ok && (await room.json()).waiting) {
+        location.href = '/u/' + hex(rt.slice(0, 8)) + '#' + b64url(k);
+        return;
+      }
+    } catch (e) {}
     location.href = '/d/' + hex(t.slice(0, 8)) + '#' + b64url(k);
   }
   go.addEventListener('click', submit);

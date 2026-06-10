@@ -493,8 +493,10 @@ func displayPassphrase(phrase, httpRelay, token string, key []byte) {
 }
 
 func cmdReceive(relay, destDir string, stayOpen bool) error {
-	token := genToken()
-	key, _ := crypto.GenerateKey()
+	phrase := passphrase.Generate()
+	token := passphrase.DeriveReceiveToken(phrase)
+	keyArr := passphrase.DeriveKey(phrase)
+	key := keyArr[:]
 
 	wsRelay := toWS(relay)
 	httpRelay := toHTTP(relay)
@@ -505,6 +507,10 @@ func cmdReceive(relay, destDir string, stayOpen bool) error {
 	if stayOpen {
 		fmt.Printf("  %sStay-open:%s waiting for multiple batches on this link (Ctrl+C to stop).\n\n", colorDim, colorReset)
 	}
+	fmt.Printf("  %s%s╔══════════════════════════════════════════╗%s\n", colorBold, colorBrand, colorReset)
+	fmt.Printf("  %s%s║  %-40s║%s\n", colorBold, colorBrand, phrase, colorReset)
+	fmt.Printf("  %s%s╚══════════════════════════════════════════╝%s\n\n", colorBold, colorBrand, colorReset)
+	fmt.Printf("  Tell the sender: type this at %s%s%s\n\n", colorBold, httpRelay, colorReset)
 	qr.GenerateTerminal(url)
 	fmt.Printf("\n  %s%s%s\n\n  %sWaiting for sender...%s\n\n", colorBrand, url, colorReset, colorDim, colorReset)
 

@@ -273,6 +273,19 @@ func (rm *RoomManager) GetOrCreateRoom(token string) *Room {
 	return room
 }
 
+// Waiting reports whether a room exists with exactly one connected client.
+func (rm *RoomManager) Waiting(token string) bool {
+	rm.mu.RLock()
+	room, exists := rm.rooms[token]
+	rm.mu.RUnlock()
+	if !exists {
+		return false
+	}
+	room.mu.Lock()
+	defer room.mu.Unlock()
+	return len(room.clients) == 1
+}
+
 func (rm *RoomManager) DeleteRoom(token string) {
 	rm.mu.Lock()
 	defer rm.mu.Unlock()
@@ -639,6 +652,18 @@ func (s *server) handleInstall(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(out))
 }
 
+func (s *server) handleRoomStatus(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if !validToken.MatchString(token) {
+		http.Error(w, "invalid token", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"waiting": s.roomManager.Waiting(token),
+	})
+}
+
 func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	fileCount, bytes := s.fileStore.Stats()
 	rooms := s.roomManager.ActiveRooms()
@@ -714,6 +739,7 @@ func main() {
 	mux.HandleFunc("GET /live", s.handleLiveSendPage)
 	mux.HandleFunc("GET /live/{token}", s.handleLiveReceivePage)
 	mux.HandleFunc("GET /ws/{token}", rateLimit(s.rl, log, s.handleWebSocket))
+	mux.HandleFunc("GET /room/{token}", rateLimit(s.rl, log, s.handleRoomStatus))
 	mux.HandleFunc("GET /health", s.handleHealth)
 
 	srv := &http.Server{
