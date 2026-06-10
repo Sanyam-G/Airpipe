@@ -72,6 +72,7 @@ code {
   font-size: 0.92rem;
 }
 .nav-right { display: inline-flex; align-items: center; gap: 22px; }
+.nav-toggle, .nav-burger { display: none; }
 .nav-link { font-size: 0.85rem; color: var(--fg-dim); }
 .nav-link:hover { color: var(--fg); }
 .nav-link.active { color: var(--fg); }
@@ -553,6 +554,8 @@ footer {
   .topnav { padding: 12px 20px; gap: 12px; }
   .nav-right { gap: 14px; }
   .nav-link { font-size: 0.8rem; }
+  .hero > *, .split > *, .selfhost > *, .dev-split > *, .cl-row > * { min-width: 0; }
+  code { overflow-wrap: anywhere; }
   .home { padding: 36px 20px 20px; gap: 40px; }
   .hero { grid-template-columns: 1fr; gap: 28px; }
   .hero-copy h1 { font-size: 1.85rem; }
@@ -568,4 +571,35 @@ footer {
   .cl-row { grid-template-columns: 60px 1fr; }
   .cl-row-date { display: none; }
   footer { padding: 20px; }
+}
+
+@media (max-width: 640px) {
+  .nav-burger {
+    display: inline-flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 4px;
+    cursor: pointer;
+  }
+  .nav-burger span {
+    width: 18px;
+    height: 2px;
+    background: var(--fg);
+    border-radius: 1px;
+  }
+  .nav-right { display: none; }
+  .nav-toggle:checked ~ .nav-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 18px;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 18px 20px;
+    background: var(--bg-elev);
+    border-bottom: 1px solid var(--stroke);
+  }
+  .nav-toggle:checked ~ .nav-right .nav-link { font-size: 0.9rem; }
 }
