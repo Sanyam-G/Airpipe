@@ -681,7 +681,11 @@ func cmdUpdate() error {
 
 	goos := runtime.GOOS
 	goarch := runtime.GOARCH
-	url := fmt.Sprintf("https://github.com/Sanyam-G/Airpipe/releases/latest/download/airpipe-%s-%s", goos, goarch)
+	ext := ""
+	if goos == "windows" {
+		ext = ".exe"
+	}
+	url := fmt.Sprintf("https://github.com/Sanyam-G/Airpipe/releases/latest/download/airpipe-%s-%s%s", goos, goarch, ext)
 
 	fmt.Printf("  Downloading latest for %s/%s...\n", goos, goarch)
 
@@ -712,9 +716,30 @@ func cmdUpdate() error {
 	}
 
 	// Write new binary to /tmp
-	tmpPath := filepath.Join(os.TempDir(), "airpipe-update")
+	tmpPath := filepath.Join(os.TempDir(), "airpipe-update"+ext)
 	if err := os.WriteFile(tmpPath, binary, 0755); err != nil {
 		return fmt.Errorf("write to temp failed: %w", err)
+	}
+
+	// Windows can't remove a running exe but can rename it.
+	if goos == "windows" {
+		old := execPath + ".old"
+		os.Remove(old)
+		if err := os.Rename(execPath, old); err != nil {
+			os.Remove(tmpPath)
+			return fmt.Errorf("move old binary aside failed: %w", err)
+		}
+		if err := os.Rename(tmpPath, execPath); err != nil {
+			if err := copyFile(tmpPath, execPath); err != nil {
+				os.Rename(old, execPath)
+				os.Remove(tmpPath)
+				return fmt.Errorf("move failed: %w", err)
+			}
+			os.Remove(tmpPath)
+		}
+		fmt.Printf("  %s✓ Updated %s%s (%s)\n", colorGreen, execPath, colorReset, fmtBytes(int64(len(binary))))
+		fmt.Printf("  %sDelete %s once no airpipe is running.%s\n\n", colorDim, old, colorReset)
+		return nil
 	}
 
 	// Replace the running binary: remove old, then move new in.
