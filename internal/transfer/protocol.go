@@ -25,7 +25,10 @@ const (
 	MsgTypeSessionEnd   MessageType = 0x36
 )
 
-const ProtocolVersion byte = 2
+// v3: multi-file batches + MsgTypeSessionEnd. A v2 receiver exits after the
+// first file's Complete and would silently drop the rest of a batch, so
+// mixed versions must fail closed at the handshake.
+const ProtocolVersion byte = 3
 
 type Metadata struct {
 	Filename string `json:"filename"`

@@ -5,6 +5,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -407,5 +408,226 @@ func TestReceiverFallback_OwnTimeout(t *testing.T) {
 	}
 	if !bytes.Equal(got, content) {
 		t.Fatalf("content mismatch: got %d bytes, want %d", len(got), len(content))
+	}
+}
+
+// senderIO returns encrypt-write and decrypt-read helpers for a fake sender socket.
+func senderIO(t *testing.T, conn *websocket.Conn, key []byte) (func(transfer.Message), func() transfer.Message) {
+	t.Helper()
+	write := func(m transfer.Message) {
+		ct, err := crypto.EncryptChunk(transfer.EncodeMessage(m), key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := conn.WriteMessage(websocket.BinaryMessage, ct); err != nil {
+			t.Fatal(err)
+		}
+	}
+	read := func() transfer.Message {
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		_, data, err := conn.ReadMessage()
+		if err != nil {
+			t.Fatalf("sender read: %v", err)
+		}
+		pt, err := crypto.DecryptChunk(data, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, err := transfer.DecodeMessage(pt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return m
+	}
+	return write, read
+}
+
+// A reloaded browser sender restarts its handshake (Version, await Ready) on
+// the same room. The receiver must re-handshake and accept the next batch.
+func TestStayOpen_SenderReloadBetweenBatches(t *testing.T) {
+	relay := startTestRelay(t)
+	defer relay.Close()
+	relayURL := "ws" + relay.URL[4:]
+	token := "reload-betweenbat"
+
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	destDir := t.TempDir()
+	want1 := []byte("before-reload")
+	want2 := []byte("after-reload-content")
+
+	var seen [][]string
+	var wg sync.WaitGroup
+	var recvErr error
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		r := transfer.NewReceiver(relayURL, token, key)
+		if err := r.ConnectLive(); err != nil {
+			recvErr = err
+			return
+		}
+		defer r.Close()
+		recvErr = r.ReceiveBatches(destDir, func(_ int, paths []string) error {
+			seen = append(seen, append([]string(nil), paths...))
+			return nil
+		}, nil)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	conn, _, err := websocket.DefaultDialer.Dial(relayURL+"/ws/"+token, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write, read := senderIO(t, conn, key)
+
+	write(transfer.NewP2PFailMessage("forced"))
+	writeOneFileWS(t, write, want1, "one.txt")
+	write(transfer.NewSessionEndMessage())
+
+	write(transfer.NewVersionMessage())
+	if m := read(); m.Type != transfer.MsgTypeReady {
+		t.Fatalf("expected Ready after version re-announce, got %#x", m.Type)
+	}
+	write(transfer.NewP2PFailMessage("forced"))
+	writeOneFileWS(t, write, want2, "two.bin")
+	write(transfer.NewSessionEndMessage())
+	conn.Close()
+
+	wg.Wait()
+	if recvErr != nil {
+		t.Fatalf("receive: %v", recvErr)
+	}
+	if len(seen) != 2 || len(seen[0]) != 1 || len(seen[1]) != 1 {
+		t.Fatalf("batches: %#v", seen)
+	}
+	got1, _ := os.ReadFile(seen[0][0])
+	got2, _ := os.ReadFile(seen[1][0])
+	if !bytes.Equal(got1, want1) || !bytes.Equal(got2, want2) {
+		t.Fatalf("content mismatch across reload")
+	}
+}
+
+// A reload mid-file discards the partial file; the resent copy lands clean.
+func TestSenderReloadMidFile_PartialDiscarded(t *testing.T) {
+	relay := startTestRelay(t)
+	defer relay.Close()
+	relayURL := "ws" + relay.URL[4:]
+	token := "reload-midfile12"
+
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	destDir := t.TempDir()
+	want := bytes.Repeat([]byte("full-content "), 1000)
+
+	var recvPaths []string
+	var wg sync.WaitGroup
+	var recvErr error
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		r := transfer.NewReceiver(relayURL, token, key)
+		if err := r.ConnectLive(); err != nil {
+			recvErr = err
+			return
+		}
+		defer r.Close()
+		recvPaths, recvErr = r.ReceiveFiles(destDir, nil)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	conn, _, err := websocket.DefaultDialer.Dial(relayURL+"/ws/"+token, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write, read := senderIO(t, conn, key)
+
+	write(transfer.NewP2PFailMessage("forced"))
+	meta, err := transfer.NewMetadataMessage("doc.bin", int64(len(want)), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(meta)
+	write(transfer.NewChunkMessage(want[:100]))
+
+	write(transfer.NewVersionMessage())
+	if m := read(); m.Type != transfer.MsgTypeReady {
+		t.Fatalf("expected Ready after mid-file restart, got %#x", m.Type)
+	}
+	write(transfer.NewP2PFailMessage("forced"))
+	writeOneFileWS(t, write, want, "doc.bin")
+	write(transfer.NewSessionEndMessage())
+	conn.Close()
+
+	wg.Wait()
+	if recvErr != nil {
+		t.Fatalf("receive: %v", recvErr)
+	}
+	if len(recvPaths) != 1 {
+		t.Fatalf("paths: %#v", recvPaths)
+	}
+	got, err := os.ReadFile(recvPaths[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, want) {
+		t.Fatalf("content mismatch after mid-file restart")
+	}
+	entries, err := os.ReadDir(destDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != "doc.bin" {
+		t.Fatalf("partial not discarded, dir: %v", entries)
+	}
+}
+
+// A peer announcing a different protocol version mid-session must fail closed.
+func TestVersionMismatchMidSession(t *testing.T) {
+	relay := startTestRelay(t)
+	defer relay.Close()
+	relayURL := "ws" + relay.URL[4:]
+	token := "reload-mismatch1"
+
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatal(err)
+	}
+	destDir := t.TempDir()
+
+	var wg sync.WaitGroup
+	var recvErr error
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		r := transfer.NewReceiver(relayURL, token, key)
+		if err := r.ConnectLive(); err != nil {
+			recvErr = err
+			return
+		}
+		defer r.Close()
+		recvErr = r.ReceiveBatches(destDir, func(int, []string) error { return nil }, nil)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	conn, _, err := websocket.DefaultDialer.Dial(relayURL+"/ws/"+token, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	write, _ := senderIO(t, conn, key)
+
+	write(transfer.NewP2PFailMessage("forced"))
+	writeOneFileWS(t, write, []byte("ok"), "ok.txt")
+	write(transfer.NewSessionEndMessage())
+	write(transfer.Message{Type: transfer.MsgTypeVersion, Payload: []byte{transfer.ProtocolVersion - 1}})
+
+	wg.Wait()
+	if recvErr == nil || !strings.Contains(recvErr.Error(), "protocol version mismatch") {
+		t.Fatalf("expected version mismatch error, got %v", recvErr)
 	}
 }

@@ -38,6 +38,11 @@ func SafeFilename(raw string) (string, error) {
 
 type msgReader func() (Message, error)
 
+// errSenderRestarted: the sender re-announced its version mid-session (a
+// reloaded browser page restarting its handshake); the receive session must
+// be re-opened from transport negotiation.
+var errSenderRestarted = errors.New("sender restarted")
+
 type Receiver struct {
 	relayURL string
 	token    string
@@ -140,6 +145,15 @@ type receiveSessionCleanup struct {
 	PeerClose       func()
 }
 
+func (c receiveSessionCleanup) run() {
+	if c.NegotiationStop != nil {
+		c.NegotiationStop()
+	}
+	if c.PeerClose != nil {
+		c.PeerClose()
+	}
+}
+
 // receiveBatch reads files until MsgTypeSessionEnd or until the sender disconnects cleanly.
 // If sessionStillOpen is true, the sender sent SessionEnd and may send another batch on the same transport.
 // When allowIdleBetweenBatches is true, a clean read error or SessionEnd before the first Metadata of this batch ends the batch with zero paths (used after the opening batch in ReceiveBatches).
@@ -159,6 +173,11 @@ func (r *Receiver) receiveBatch(read msgReader, destDir string, progressFn func(
 			nextPrimed = &first
 		case MsgTypeSessionEnd:
 			return nil, false, nil
+		case MsgTypeVersion:
+			if verr := r.reHandshake(first); verr != nil {
+				return nil, false, verr
+			}
+			return nil, false, errSenderRestarted
 		default:
 			return nil, false, fmt.Errorf("unexpected message while waiting for next batch (%#x)", first.Type)
 		}
@@ -194,6 +213,11 @@ func (r *Receiver) receiveBatch(read msgReader, destDir string, progressFn func(
 			return paths, true, nil
 		case MsgTypeMetadata:
 			nextPrimed = &msg
+		case MsgTypeVersion:
+			if verr := r.reHandshake(msg); verr != nil {
+				return paths, false, verr
+			}
+			return paths, false, errSenderRestarted
 		default:
 			return paths, false, fmt.Errorf("unexpected message after file (%#x)", msg.Type)
 		}
@@ -210,20 +234,22 @@ func (r *Receiver) ReceiveFiles(destDir string, progressFn func(fileIndex int, r
 	}
 
 	read, sessCleanup, primed, err := r.openReceiveSession()
-	defer func() {
-		if sessCleanup.NegotiationStop != nil {
-			sessCleanup.NegotiationStop()
-		}
-		if sessCleanup.PeerClose != nil {
-			sessCleanup.PeerClose()
-		}
-	}()
+	defer func() { sessCleanup.run() }()
 	if err != nil {
 		return nil, err
 	}
 
-	paths, _, err := r.receiveBatch(read, destDir, progressFn, primed, false)
-	return paths, err
+	for {
+		paths, _, rerr := r.receiveBatch(read, destDir, progressFn, primed, false)
+		if !errors.Is(rerr, errSenderRestarted) {
+			return paths, rerr
+		}
+		sessCleanup.run()
+		read, sessCleanup, primed, err = r.openReceiveSession()
+		if err != nil {
+			return nil, err
+		}
+	}
 }
 
 // ReceiveBatches negotiates once, then receives zero or more batches until the sender closes the connection.
@@ -238,14 +264,7 @@ func (r *Receiver) ReceiveBatches(destDir string, onBatch func(batchIndex int, p
 	}
 
 	read, sessCleanup, primed, err := r.openReceiveSession()
-	defer func() {
-		if sessCleanup.NegotiationStop != nil {
-			sessCleanup.NegotiationStop()
-		}
-		if sessCleanup.PeerClose != nil {
-			sessCleanup.PeerClose()
-		}
-	}()
+	defer func() { sessCleanup.run() }()
 	if err != nil {
 		return err
 	}
@@ -255,6 +274,20 @@ func (r *Receiver) ReceiveBatches(destDir string, onBatch func(batchIndex int, p
 	for {
 		paths, sessionOpen, rerr := r.receiveBatch(read, destDir, progressFn, nextPrimed, batchIdx > 0)
 		nextPrimed = nil
+		if errors.Is(rerr, errSenderRestarted) {
+			if len(paths) > 0 {
+				if err := onBatch(batchIdx, paths); err != nil {
+					return err
+				}
+				batchIdx++
+			}
+			sessCleanup.run()
+			read, sessCleanup, nextPrimed, err = r.openReceiveSession()
+			if err != nil {
+				return err
+			}
+			continue
+		}
 		if rerr != nil {
 			return rerr
 		}
@@ -269,6 +302,20 @@ func (r *Receiver) ReceiveBatches(destDir string, onBatch func(batchIndex int, p
 			return nil
 		}
 	}
+}
+
+// reHandshake answers a mid-session version announce. A reloaded web sender
+// rejoins the room and restarts its handshake on the receiver's open socket,
+// so validate the version and re-send Ready to unblock it (#13 reload edge).
+func (r *Receiver) reHandshake(msg Message) error {
+	if len(msg.Payload) == 0 || msg.Payload[0] != ProtocolVersion {
+		got := byte(0)
+		if len(msg.Payload) > 0 {
+			got = msg.Payload[0]
+		}
+		return fmt.Errorf("protocol version mismatch: got %d, expected %d (run `airpipe update`)", got, ProtocolVersion)
+	}
+	return writeSignalMsg(r.conn, r.key, NewReadyMessage())
 }
 
 func isSessionEndReadErr(err error) bool {
@@ -293,6 +340,12 @@ func isSessionEndReadErr(err error) bool {
 func (r *Receiver) openReceiveSession() (read msgReader, cleanup receiveSessionCleanup, primed *Message, err error) {
 	r.conn.SetReadDeadline(time.Now().Add(30 * time.Second))
 	first, err := readSignalMsg(r.conn, r.key)
+	for err == nil && first.Type == MsgTypeVersion {
+		if verr := r.reHandshake(first); verr != nil {
+			return nil, cleanup, nil, verr
+		}
+		first, err = readSignalMsg(r.conn, r.key)
+	}
 	if err != nil {
 		return nil, cleanup, nil, fmt.Errorf("read first message: %w", err)
 	}
@@ -403,6 +456,17 @@ func (r *Receiver) recvFile(read msgReader, destDir string, progressFn func(rece
 			return "", false, fmt.Errorf("sender error: %s", string(msg.Payload))
 		case MsgTypeSessionEnd:
 			return "", false, fmt.Errorf("session end before file finished")
+		case MsgTypeVersion:
+			if file != nil {
+				file.Close()
+				file = nil
+				os.Remove(destPath)
+				fmt.Fprintf(os.Stderr, "sender restarted mid-transfer, partial file discarded: %s\n", destPath)
+			}
+			if err := r.reHandshake(msg); err != nil {
+				return "", false, err
+			}
+			return "", false, errSenderRestarted
 		}
 		return "", false, nil
 	}
