@@ -411,7 +411,7 @@ func TestReceiverFallback_OwnTimeout(t *testing.T) {
 	}
 }
 
-// senderIO returns encrypt-write and decrypt-read helpers for a fake sender socket.
+// senderIO returns write and read helpers for a fake sender socket.
 func senderIO(t *testing.T, conn *websocket.Conn, key []byte) (func(transfer.Message), func() transfer.Message) {
 	t.Helper()
 	write := func(m transfer.Message) {
