@@ -123,3 +123,18 @@ func TestWordlistSize(t *testing.T) {
 		seen[w] = true
 	}
 }
+
+func TestDeriveReceiveTokenDistinct(t *testing.T) {
+	phrase := "RIVER FALCON MARBLE 42"
+	dl := DeriveToken(phrase)
+	recv := DeriveReceiveToken(phrase)
+	if dl == recv {
+		t.Fatal("receive token must not collide with download token")
+	}
+	if len(recv) != 16 {
+		t.Fatalf("token length %d, want 16", len(recv))
+	}
+	if recv != DeriveReceiveToken("river falcon  marble 42") {
+		t.Fatal("normalization must apply to receive tokens")
+	}
+}

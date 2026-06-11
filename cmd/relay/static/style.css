@@ -299,6 +299,17 @@ a:hover { color: var(--accent); }
   border-color: var(--accent-strong);
   filter: brightness(1.05);
 }
+.cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.batch-actions {
+  margin-top: 20px;
+}
+.batch-actions .cta {
+  min-width: 220px;
+}
 
 /* passphrase row (homepage redeem) */
 .phrase-row {

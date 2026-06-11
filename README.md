@@ -65,7 +65,9 @@ Or via Go:
 go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest
 ```
 
-Self-update later: `airpipe update`. Linux + macOS, amd64 + arm64.
+Self-update later: `airpipe update`. Linux + macOS + Windows, amd64 + arm64.
+
+On Windows, grab `airpipe-windows-amd64.exe` from the [latest release](https://github.com/Sanyam-G/Airpipe/releases/latest) and put it on your PATH.
 
 ### Send
 

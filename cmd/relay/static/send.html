@@ -22,14 +22,14 @@
 <main class="grid single">
 
   <section id="select" class="block">
-    <h2>Send a file</h2>
+    <h2>Send files</h2>
     <p class="block-sub">Encryption happens in your browser. The relay holds the ciphertext for 10 minutes; the receiver decrypts locally with the passphrase.</p>
     <div class="drop-zone" id="dropzone">
       <div class="drop-icon">+</div>
-      <div class="drop-label">tap to select or <strong>drop a file</strong></div>
-      <div class="drop-hint">any type · up to 500 mb</div>
+      <div class="drop-label">tap to select or <strong>drop files</strong></div>
+      <div class="drop-hint">any type · up to 500 mb · multiple files = one mailbox bundle</div>
     </div>
-    <input type="file" id="fileinput">
+    <input type="file" id="fileinput" multiple>
   </section>
 
   <section id="encrypting" class="block hidden">
@@ -83,6 +83,8 @@
 <script src="/static/nacl-fast.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="/static/words.js"></script>
+<script src="/static/airpipe-protocol.js"></script>
+<script src="/static/airpipe-mailbox.js"></script>
 <script>
 if(!window.isSecureContext){
   const w=document.createElement('div');
@@ -94,12 +96,16 @@ const dropzone=document.getElementById('dropzone');
 const fileinput=document.getElementById('fileinput');
 
 dropzone.addEventListener('click',()=>fileinput.click());
-fileinput.addEventListener('change',(e)=>{if(e.target.files.length)handleFile(e.target.files[0])});
+fileinput.addEventListener('change',(e)=>{
+  const fl=e.target.files;
+  if(fl&&fl.length)handleFiles(fl);
+});
 dropzone.addEventListener('dragover',(e)=>{e.preventDefault();dropzone.classList.add('dragover')});
 dropzone.addEventListener('dragleave',()=>dropzone.classList.remove('dragover'));
 dropzone.addEventListener('drop',(e)=>{
   e.preventDefault();dropzone.classList.remove('dragover');
-  if(e.dataTransfer.files.length)handleFile(e.dataTransfer.files[0]);
+  const fl=e.dataTransfer.files;
+  if(fl&&fl.length)handleFiles(fl);
 });
 
 function show(id){
@@ -113,13 +119,6 @@ function b64encode(bytes){
   let binary='';
   for(let i=0;i<bytes.length;i++)binary+=String.fromCharCode(bytes[i]);
   return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-
-function formatSize(bytes){
-  if(bytes===0)return '0 B';
-  const units=['B','KB','MB','GB'];
-  const i=Math.floor(Math.log(bytes)/Math.log(1024));
-  return (bytes/Math.pow(1024,i)).toFixed(i===0?0:1)+' '+units[i];
 }
 
 let shareURL='';
@@ -155,7 +154,9 @@ function hexEncode(bytes){
   return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-async function handleFile(file){
+async function handleFiles(filesIn){
+  const fileListArr=Array.from(filesIn||[]);
+  if(!fileListArr.length)return;
   try{
     currentPhrase=generatePassphrase();
     const normalized=currentPhrase.toUpperCase().trim().replace(/\s+/g,' ');
@@ -164,28 +165,32 @@ async function handleFile(file){
     const keyBytes=await sha256('airpipe:key:'+normalized);
 
     show('encrypting');
-    document.getElementById('enc-name').textContent=file.name;
     document.getElementById('enc-progress').style.width='10%';
-    document.getElementById('enc-text').textContent='reading file...';
+    document.getElementById('enc-text').textContent=fileListArr.length>1?'reading files…':'reading file…';
 
-    const arrayBuf=await file.arrayBuffer();
-    const fileBytes=new Uint8Array(arrayBuf);
-
-    document.getElementById('enc-progress').style.width='30%';
-    document.getElementById('enc-text').textContent='building payload...';
-
-    const fnBytes=new TextEncoder().encode(file.name);
-    const fnLen=fnBytes.length;
-    const payload=new Uint8Array(4+fnLen+fileBytes.length);
-    payload[0]=(fnLen>>24)&0xff;
-    payload[1]=(fnLen>>16)&0xff;
-    payload[2]=(fnLen>>8)&0xff;
-    payload[3]=fnLen&0xff;
-    payload.set(fnBytes,4);
-    payload.set(fileBytes,4+fnLen);
+    let payload;
+    if(fileListArr.length===1){
+      const file=fileListArr[0];
+      document.getElementById('enc-name').textContent=file.name;
+      const content=new Uint8Array(await file.arrayBuffer());
+      document.getElementById('enc-progress').style.width='30%';
+      document.getElementById('enc-text').textContent='building payload…';
+      payload=encodeMailboxV1(file.name,content);
+    }else{
+      document.getElementById('enc-name').textContent=fileListArr.length+' files';
+      document.getElementById('enc-progress').style.width='25%';
+      document.getElementById('enc-text').textContent='reading files…';
+      const entries=[];
+      for(const f of fileListArr){
+        entries.push({name:f.name||'file',content:new Uint8Array(await f.arrayBuffer())});
+      }
+      payload=encodeMailboxAMB2(entries);
+      document.getElementById('enc-progress').style.width='40%';
+      document.getElementById('enc-text').textContent='building bundle…';
+    }
 
     document.getElementById('enc-progress').style.width='60%';
-    document.getElementById('enc-text').textContent='encrypting...';
+    document.getElementById('enc-text').textContent='encrypting…';
 
     const nonce=nacl.randomBytes(24);
     const ciphertext=nacl.secretbox(payload,nonce,keyBytes);
@@ -198,7 +203,7 @@ async function handleFile(file){
     document.getElementById('enc-text').textContent='encrypted · '+formatSize(encrypted.length);
 
     show('uploading');
-    document.getElementById('up-name').textContent=file.name;
+    document.getElementById('up-name').textContent=fileListArr.length===1?fileListArr[0].name:(fileListArr.length+' files');
 
     const formData=new FormData();
     formData.append('token',derivedToken);

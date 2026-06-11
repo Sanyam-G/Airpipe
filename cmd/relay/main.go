@@ -236,10 +236,10 @@ func shortToken(t string) string {
 }
 
 type Room struct {
-	token     string
-	clients   []*websocket.Conn
-	mu        sync.Mutex
-	createdAt time.Time
+	token        string
+	clients      []*websocket.Conn
+	mu           sync.Mutex
+	lastActivity time.Time
 }
 
 type RoomManager struct {
@@ -268,9 +268,22 @@ func (rm *RoomManager) GetOrCreateRoom(token string) *Room {
 	if room, exists := rm.rooms[token]; exists {
 		return room
 	}
-	room := &Room{token: token, clients: make([]*websocket.Conn, 0, 2), createdAt: time.Now()}
+	room := &Room{token: token, clients: make([]*websocket.Conn, 0, 2), lastActivity: time.Now()}
 	rm.rooms[token] = room
 	return room
+}
+
+// Waiting reports whether a room exists with exactly one connected client.
+func (rm *RoomManager) Waiting(token string) bool {
+	rm.mu.RLock()
+	room, exists := rm.rooms[token]
+	rm.mu.RUnlock()
+	if !exists {
+		return false
+	}
+	room.mu.Lock()
+	defer room.mu.Unlock()
+	return len(room.clients) == 1
 }
 
 func (rm *RoomManager) DeleteRoom(token string) {
@@ -293,14 +306,17 @@ func (rm *RoomManager) cleanupLoop() {
 		case <-ticker.C:
 			rm.mu.Lock()
 			for token, room := range rm.rooms {
-				if time.Since(room.createdAt) > 10*time.Minute {
-					room.mu.Lock()
+				room.mu.Lock()
+				idle := time.Since(room.lastActivity)
+				if idle > 10*time.Minute {
 					for _, conn := range room.clients {
 						conn.Close()
 					}
 					room.mu.Unlock()
 					delete(rm.rooms, token)
+					continue
 				}
+				room.mu.Unlock()
 			}
 			rm.mu.Unlock()
 		case <-rm.ctx.Done():
@@ -329,23 +345,43 @@ func (room *Room) AddClient(conn *websocket.Conn) bool {
 		return false
 	}
 	room.clients = append(room.clients, conn)
+	room.lastActivity = time.Now()
 	return true
 }
 
 func (room *Room) RemoveClient(conn *websocket.Conn) {
 	room.mu.Lock()
-	defer room.mu.Unlock()
+	nBefore := len(room.clients)
+	idx := -1
 	for i, c := range room.clients {
 		if c == conn {
-			room.clients = append(room.clients[:i], room.clients[i+1:]...)
+			idx = i
 			break
 		}
+	}
+	if idx < 0 {
+		room.mu.Unlock()
+		return
+	}
+	room.clients = append(room.clients[:idx], room.clients[idx+1:]...)
+
+	var toKick []*websocket.Conn
+	if nBefore == 2 && len(room.clients) == 1 {
+		toKick = append(toKick, room.clients[0])
+		room.clients = room.clients[:0]
+	}
+	room.mu.Unlock()
+
+	for _, oc := range toKick {
+		_ = oc.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "peer disconnected"))
+		oc.Close()
 	}
 }
 
 func (room *Room) Broadcast(sender *websocket.Conn, message []byte) {
 	room.mu.Lock()
 	defer room.mu.Unlock()
+	room.lastActivity = time.Now()
 	for _, conn := range room.clients {
 		if conn != sender {
 			_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
@@ -616,6 +652,18 @@ func (s *server) handleInstall(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(out))
 }
 
+func (s *server) handleRoomStatus(w http.ResponseWriter, r *http.Request) {
+	token := r.PathValue("token")
+	if !validToken.MatchString(token) {
+		http.Error(w, "invalid token", http.StatusBadRequest)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"waiting": s.roomManager.Waiting(token),
+	})
+}
+
 func (s *server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	fileCount, bytes := s.fileStore.Stats()
 	rooms := s.roomManager.ActiveRooms()
@@ -691,6 +739,7 @@ func main() {
 	mux.HandleFunc("GET /live", s.handleLiveSendPage)
 	mux.HandleFunc("GET /live/{token}", s.handleLiveReceivePage)
 	mux.HandleFunc("GET /ws/{token}", rateLimit(s.rl, log, s.handleWebSocket))
+	mux.HandleFunc("GET /room/{token}", rateLimit(s.rl, log, s.handleRoomStatus))
 	mux.HandleFunc("GET /health", s.handleHealth)
 
 	srv := &http.Server{

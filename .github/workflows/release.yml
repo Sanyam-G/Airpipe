@@ -15,27 +15,37 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: docker/setup-qemu-action@v3
+
+      - uses: docker/setup-buildx-action@v3
+
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Compute image tags
+      - name: Compute image tags and version
         id: tags
         run: |
           tags="ghcr.io/sanyam-g/airpipe-relay:latest"
+          version="main-${GITHUB_SHA::7}"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            tags="${tags},ghcr.io/sanyam-g/airpipe-relay:${GITHUB_REF#refs/tags/}"
+            version="${GITHUB_REF#refs/tags/}"
+            tags="${tags},ghcr.io/sanyam-g/airpipe-relay:${version}"
           fi
           echo "tags=${tags}" >> "$GITHUB_OUTPUT"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push relay image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.tags.outputs.tags }}
+          build-args: |
+            VERSION=${{ steps.tags.outputs.version }}
 
   binaries:
     if: startsWith(github.ref, 'refs/tags/')
@@ -51,6 +61,12 @@ jobs:
             goarch: amd64
           - goos: darwin
             goarch: arm64
+          - goos: windows
+            goarch: amd64
+            ext: .exe
+          - goos: windows
+            goarch: arm64
+            ext: .exe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -62,9 +78,9 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
-        run: go build -o airpipe-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/airpipe
+        run: go build -o airpipe-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/airpipe
 
       - name: Upload release binary
         uses: softprops/action-gh-release@v2
         with:
-          files: airpipe-${{ matrix.goos }}-${{ matrix.goarch }}
+          files: airpipe-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
