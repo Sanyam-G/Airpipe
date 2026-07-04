@@ -78,7 +78,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "0"
-        run: go build -o airpipe-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/airpipe
+        run: go build -ldflags "-X main.buildVersion=${GITHUB_REF_NAME}" -o airpipe-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/airpipe
 
       - name: Upload release binary
         uses: softprops/action-gh-release@v2
