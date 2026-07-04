@@ -52,6 +52,10 @@ Env vars if you want to tune things:
 | `AIRPIPE_ALLOWED_ORIGINS` | `http://localhost:8080,http://127.0.0.1:8080` | Comma-separated origins for CORS. Set to the domain(s) you host from. Use `*` to allow any. |
 | `AIRPIPE_RATE_LIMIT_PER_MIN` | `60` | |
 | `AIRPIPE_LOG_FORMAT` | `json` | Or `text`. |
+| `AIRPIPE_MAX_UPLOAD_MB` | `500` | Mailbox size cap. |
+| `AIRPIPE_FILE_EXPIRY` | `10m` | Mailbox expiry, Go duration (`30m`, `1h`). |
+
+The relay reports its config and stats at `/health` (JSON) and `/metrics` (Prometheus text). The web pages pick up the real size cap and expiry from `/health`, so custom limits show up in the UI automatically.
 
 ## CLI
 

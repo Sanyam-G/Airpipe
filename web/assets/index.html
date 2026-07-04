@@ -46,7 +46,7 @@
         </div>
         <p class="hero-meta">
           <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
-          &nbsp;·&nbsp; v4.1.5 &nbsp;·&nbsp; MIT &nbsp;·&nbsp; <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a>
+          &nbsp;·&nbsp; <span id="relay-version">v4.2.0</span> &nbsp;·&nbsp; MIT &nbsp;·&nbsp; <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a>
         </p>
       </div>
       <div class="hero-demo">
@@ -98,7 +98,7 @@
       <div>
         <h2>Run your own relay.</h2>
         <p>AirPipe is open-source and self-hostable. One command boots a relay you fully control.</p>
-        <p>Point the CLI at it with <code>AIRPIPE_RELAY</code>.</p>
+        <p>Point the CLI at it with <code>AIRPIPE_RELAY</code>. Size cap, expiry, and rate limit are env-configurable, and the relay exposes <code>/health</code> and <code>/metrics</code> for monitoring.</p>
         <p class="sh-foot">MIT · <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a></p>
       </div>
       <div class="code-stack">
@@ -112,11 +112,11 @@
       <div class="split-col">
         <h2 class="section-label">Roadmap</h2>
         <ul class="rm-line">
-          <li><span class="rm-status next">next</span>Persistent multi-file pairing</li>
           <li><span class="rm-status next">next</span>Receiver-side accept prompt</li>
-          <li><span class="rm-status soon">soon</span>Multi-arch Docker image</li>
+          <li><span class="rm-status next">next</span>Resume interrupted transfers</li>
           <li><span class="rm-status soon">soon</span>TURN relay for tricky networks</li>
           <li><span class="rm-status later">later</span>LAN device auto-discovery</li>
+          <li><span class="rm-status later">later</span>Per-relay storage caps</li>
         </ul>
         <p class="section-foot"><a href="/development#roadmap">Full roadmap →</a></p>
       </div>
@@ -140,6 +140,6 @@
     </div>
   </footer>
 
-  <script src="/site/app.js?v=20260610a" defer></script>
+  <script src="/site/app.js?v=20260704a" defer></script>
 </body>
 </html>
