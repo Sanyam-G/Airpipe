@@ -104,7 +104,7 @@
 </footer>
 
 <script src="/static/nacl-fast.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="/static/qrcode.min.js"></script>
 <script src="/static/words.js"></script>
 <script src="/static/airpipe-protocol.js"></script>
 <script>
@@ -343,7 +343,7 @@ async function sendFiles(fileList){
       totalSent+=file.size;
     }
     if(usingP2PMedia){
-      while(dc.bufferedAmount>0){await sleep(10)}
+      await drainDC(0);
     }
     await sendFn(encode(MSG_SESSION_END,new Uint8Array(0)));
 
@@ -412,16 +412,29 @@ async function streamFile(file,sendFn){
   await sendFn(encode(MSG_COMPLETE,new Uint8Array(0)));
 }
 
+const DC_HIGH_WATER=8*1024*1024;
+const DC_LOW_WATER=1024*1024;
+
 async function sendDC(plaintext){
-  while(dc.bufferedAmount>8*1024*1024){await sleep(5)}
+  if(dc.bufferedAmount>DC_HIGH_WATER){await drainDC(DC_LOW_WATER)}
   dc.send(encrypt(plaintext,keyBytes));
+}
+
+// Wait for the DataChannel send buffer to drop to threshold using the
+// bufferedamountlow event instead of a sleep-poll loop.
+function drainDC(threshold){
+  return new Promise(resolve=>{
+    if(!dc||dc.bufferedAmount<=threshold)return resolve();
+    dc.bufferedAmountLowThreshold=threshold;
+    const done=()=>{dc.removeEventListener('bufferedamountlow',done);clearInterval(guard);resolve()};
+    dc.addEventListener('bufferedamountlow',done);
+    const guard=setInterval(()=>{if(dc.bufferedAmount<=threshold)done()},250);
+  });
 }
 
 function sendWS(plaintext){
   ws.send(encrypt(plaintext,keyBytes));
 }
-
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 </script>
 </body>
 </html>
