@@ -365,15 +365,24 @@ func TestOriginAllowlist(t *testing.T) {
 		{"https://AIRPIPE.SANYAMGARG.COM", true},
 		{"https://evil.example.com", false},
 		{"http://airpipe.sanyamgarg.com", false}, // scheme mismatch
+		{"http://example.com", true},             // same-origin: matches request Host
+		{"http://localhost:8199", false},         // different host, not allowlisted
 	}
 	for _, c := range cases {
-		r := httptest.NewRequest("GET", "/ws/x", nil)
+		r := httptest.NewRequest("GET", "/ws/x", nil) // Host: example.com
 		if c.origin != "" {
 			r.Header.Set("Origin", c.origin)
 		}
 		if got := check(r); got != c.allow {
 			t.Errorf("origin %q: got allow=%v, want %v", c.origin, got, c.allow)
 		}
+	}
+
+	// Same-origin on a custom port: the localhost:8199 case self-hosters hit.
+	r := httptest.NewRequest("GET", "http://localhost:8199/ws/x", nil)
+	r.Header.Set("Origin", "http://localhost:8199")
+	if !check(r) {
+		t.Error("same-origin on custom port should be allowed")
 	}
 }
 

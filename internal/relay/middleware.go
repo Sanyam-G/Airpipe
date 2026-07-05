@@ -88,6 +88,11 @@ func originChecker(cfg Config, log *slog.Logger) func(*http.Request) bool {
 			log.Warn("invalid ws origin", "origin", origin)
 			return false
 		}
+		// Same-origin is always fine: pages served by this relay may talk to
+		// it whatever host/port it runs on.
+		if strings.EqualFold(u.Host, r.Host) {
+			return true
+		}
 		origin = strings.ToLower(u.Scheme + "://" + u.Host)
 		for _, allowed := range cfg.AllowedOrigins {
 			if strings.EqualFold(origin, allowed) {
