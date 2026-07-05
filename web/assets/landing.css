@@ -323,6 +323,11 @@ main > section, main > div, main > header { border-bottom: 1px solid var(--line)
 
 .term-body .tl { display: none; }
 .term-body .tl.on, .term-body .t-first { display: block; }
+.term-body .tl.on { animation: line-in 0.22s ease; }
+@keyframes line-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: none; }
+}
 .t-brand { color: var(--accent); font-weight: 600; }
 .t-ink { color: var(--ink); }
 .t-dim { color: var(--mut); font-weight: 400; }

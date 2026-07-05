@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site/landing.css?v=20260705b">
+<link rel="stylesheet" href="/site/landing.css?v=20260705c">
 </head>
 <body class="page-home">
 
@@ -193,7 +193,7 @@
     var pipe = document.getElementById('pipe');
     var lines = Array.prototype.slice.call(document.querySelectorAll('#demo-duo .tl[data-s]'));
     if (!typeS || !typeR || !lines.length) return;
-    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var SIZE_MB = 4.2;
     var timers = [];
     function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
     function show(n) {
@@ -202,8 +202,9 @@
     }
     function setBar(bar, pct, p) {
       var cells = 24, fill = Math.round(cells * p / 100);
+      var mb = (SIZE_MB * p / 100).toFixed(1);
       bar.textContent = '█'.repeat(fill) + '░'.repeat(cells - fill);
-      pct.textContent = (p < 10 ? '  ' : p < 100 ? ' ' : '') + p + '%';
+      pct.textContent = (p < 10 ? '  ' : p < 100 ? ' ' : '') + p + '%  ' + mb + '/' + SIZE_MB + ' MB';
     }
     function typeInto(el, caret, cmd, t0, speed) {
       at(t0, function () { caret.classList.remove('off'); });
@@ -221,13 +222,6 @@
       pipe.classList.remove('live');
       lines.forEach(function (l) { l.classList.remove('on'); });
       setBar(barS, pctS, 0); setBar(barR, pctR, 0);
-      if (reduced) {
-        typeS.textContent = CMD_S; typeR.textContent = CMD_R;
-        caretS.classList.add('off');
-        lines.forEach(function (l) { l.classList.add('on'); });
-        setBar(barS, pctS, 100); setBar(barR, pctR, 100);
-        return;
-      }
       // Sender types, gets the passphrase, waits.
       var t = typeInto(typeS, caretS, CMD_S, 500, 34);
       at(t += 250, function () { caretS.classList.add('off'); show('s1'); });
@@ -244,15 +238,18 @@
       // The two ends pair; the pipe goes live and both bars fill together.
       at(t += 350, function () { show('s6'); pipe.classList.add('live'); });
       at(t += 400, function () { show('s7'); show('r5'); });
-      var steps = [3, 9, 18, 31, 47, 63, 78, 90, 97, 100];
-      for (var s = 0; s < steps.length; s++) {
+      // Eased fill: fast middle, soft landing, receiver a beat behind.
+      var N = 26;
+      for (var s = 1; s <= N; s++) {
+        var x = s / N;
+        var p = Math.round(100 * (1 - Math.pow(1 - x, 2.2)));
         (function (p, tt) {
           at(tt, function () { setBar(barS, pctS, p); });
-          at(tt + 90, function () { setBar(barR, pctR, p); });
-        })(steps[s], t);
-        t += 190;
+          at(tt + 110, function () { setBar(barR, pctR, p); });
+        })(p, t);
+        t += 95;
       }
-      at(t += 300, function () { pipe.classList.remove('live'); show('s8'); });
+      at(t += 320, function () { pipe.classList.remove('live'); show('s8'); });
       at(t += 200, function () { show('r6'); });
       at(t + 4500, run);
     }
