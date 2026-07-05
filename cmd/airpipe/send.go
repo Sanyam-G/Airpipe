@@ -116,8 +116,7 @@ func cmdSend(relay string, args []string) error {
 	return fmt.Errorf("invalid mode: %s", resolvedMode)
 }
 
-// archiveName derives the zip name from what's being sent: a single folder
-// keeps its own name, anything else is stamped with the item count.
+// archiveName: a single folder keeps its name, anything else gets an item count.
 func archiveName(paths []string) string {
 	if len(paths) == 1 {
 		base := filepath.Base(filepath.Clean(paths[0]))

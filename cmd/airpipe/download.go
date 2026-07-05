@@ -16,9 +16,7 @@ import (
 
 func cmdDownload(relay string, args []string) error {
 	stayOpen, args := parseStayOpenFlags(args)
-	// Parse passphrase: last arg might be a directory, or part of the passphrase
-	// Passphrase is typically 5 tokens: WORD WORD WORD WORD NN
-	// Try to detect if last arg is a directory
+	// The last arg may be a destination dir rather than part of the passphrase.
 	destDir := "."
 	phraseArgs := args
 

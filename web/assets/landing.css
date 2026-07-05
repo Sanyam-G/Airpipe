@@ -1,4 +1,4 @@
-/* AirPipe site — full-bleed, grid-lined, terminal-first. */
+/* AirPipe site */
 
 :root {
   --bg: #14100D;
@@ -12,7 +12,7 @@
   --line-soft: rgba(236, 230, 220, 0.07);
   --sans: 'Inter', -apple-system, sans-serif;
   --mono: 'JetBrains Mono', ui-monospace, monospace;
-  --gx: clamp(24px, 4vw, 72px); /* global horizontal gutter */
+  --gx: clamp(24px, 4vw, 72px);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -319,7 +319,6 @@ main > section { border-bottom: 1px solid var(--line); }
   padding: 4px 6px;
 }
 
-/* pane view switching: CLI (default) vs WEB */
 .pane .web-body { display: none; }
 .pane.view-web .term-body { display: none; }
 .pane.view-web .web-body { display: block; }

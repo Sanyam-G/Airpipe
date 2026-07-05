@@ -92,8 +92,7 @@ if(!window.isSecureContext){
   w.textContent='This page needs HTTPS (or localhost) to encrypt files. Put the relay behind a reverse proxy with TLS, or access it locally.';
   document.body.prepend(w);
 }
-// Self-hosted relays can change the size cap and expiry; reflect the real
-// limits instead of the defaults baked into the copy.
+// Show the relay's real size cap and expiry, not the default copy.
 fetch('/health').then(r=>r.json()).then(h=>{
   const mb=h.max_upload_bytes?Math.round(h.max_upload_bytes/1048576):null;
   const mins=h.expiry_seconds?Math.round(h.expiry_seconds/60):null;

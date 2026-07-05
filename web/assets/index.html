@@ -97,7 +97,7 @@
                     <div class="wb-qr" aria-hidden="true"></div>
                   </div>
                   <div class="wl wb-dim" data-s="s5">Waiting for receiver…</div>
-                  <div class="wl wb-ok" data-s="s6">✓ Receiver joined — sending <b>demo.zip</b> · 4.2 MB</div>
+                  <div class="wl wb-ok" data-s="s6">✓ Receiver joined · sending <b>demo.zip</b> · 4.2 MB</div>
                   <div class="wl" data-s="s7">
                     <div class="wb-bar"><div class="wb-fill" id="wfill-s"></div></div>
                     <div class="wb-pct" id="wpct-s">0%</div>
@@ -147,7 +147,7 @@
               </div>
             </div>
           </div>
-          <p class="term-cap">Both sides, live. Flip either side between CLI and WEB — every pairing works.</p>
+          <p class="term-cap">Both sides, live. Flip either side between CLI and WEB. Every pairing works.</p>
         </div>
       </div>
     </section>
@@ -279,23 +279,19 @@
       pipe.classList.remove('live');
       lines.forEach(function (l) { l.classList.remove('on'); });
       setBar(barS, pctS, wfillS, wpctS, 0); setBar(barR, pctR, wfillR, wpctR, 0);
-      // Sender types, gets the passphrase, waits.
       var t = typeInto(typeS, caretS, CMD_S, 500, 34);
       at(t += 250, function () { caretS.classList.add('off'); show('s1'); });
       at(t += 350, function () { show('s2'); });
       at(t += 450, function () { show('s3'); });
       at(t += 250, function () { show('s4'); });
       at(t += 400, function () { show('s5'); });
-      // Receiver types the passphrase command while the sender waits.
       t = typeInto(typeR, caretR, CMD_R, t + 700, 26);
       at(t += 200, function () { caretR.classList.add('off'); show('r1'); });
       at(t += 300, function () { show('r2'); });
       at(t += 350, function () { show('r3'); });
       at(t += 550, function () { show('r4'); });
-      // The two ends pair; the pipe goes live and both bars fill together.
       at(t += 350, function () { show('s6'); pipe.classList.add('live'); });
       at(t += 400, function () { show('s7'); show('r5'); });
-      // Eased fill: fast middle, soft landing, receiver a beat behind.
       var N = 26;
       for (var s = 1; s <= N; s++) {
         var x = s / N;

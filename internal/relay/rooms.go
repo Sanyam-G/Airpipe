@@ -124,8 +124,7 @@ func (room *Room) AddClient(conn *websocket.Conn) bool {
 	return true
 }
 
-// RemoveClient drops conn from the room; if a peer remains it gets kicked so
-// stale one-sided sessions don't linger.
+// RemoveClient drops conn and kicks any remaining peer.
 func (room *Room) RemoveClient(conn *websocket.Conn) {
 	room.mu.Lock()
 	nBefore := len(room.clients)

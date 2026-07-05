@@ -26,8 +26,7 @@ func LoadConfig() Config {
 		MaxUploadBytes:  int64(getenvInt("AIRPIPE_MAX_UPLOAD_MB", 500)) << 20,
 		FileExpiry:      getenvDuration("AIRPIPE_FILE_EXPIRY", 10*time.Minute),
 	}
-	// Same-origin browsers are always allowed by the checker; this list is
-	// only for pages served from a different domain than the relay.
+	// Only needed for pages served from a different domain; same-origin is always allowed.
 	raw := strings.TrimSpace(os.Getenv("AIRPIPE_ALLOWED_ORIGINS"))
 	if raw == "" {
 		c.AllowedOrigins = nil

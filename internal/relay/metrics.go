@@ -8,8 +8,7 @@ import (
 	"github.com/sanyamgarg/airpipe/internal/transfer"
 )
 
-// handleMetrics serves Prometheus text exposition format, hand-rolled so the
-// relay stays dependency-free.
+// handleMetrics serves Prometheus text format without a client dependency.
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	fileCount, fileBytes := s.fileStore.Stats()
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")

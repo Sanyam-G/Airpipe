@@ -378,7 +378,7 @@ func TestOriginAllowlist(t *testing.T) {
 		}
 	}
 
-	// Same-origin on a custom port: the localhost:8199 case self-hosters hit.
+	// Same-origin on a custom port.
 	r := httptest.NewRequest("GET", "http://localhost:8199/ws/x", nil)
 	r.Header.Set("Origin", "http://localhost:8199")
 	if !check(r) {

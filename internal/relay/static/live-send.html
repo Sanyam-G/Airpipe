@@ -420,8 +420,6 @@ async function sendDC(plaintext){
   dc.send(encrypt(plaintext,keyBytes));
 }
 
-// Wait for the DataChannel send buffer to drop to threshold using the
-// bufferedamountlow event instead of a sleep-poll loop.
 function drainDC(threshold){
   return new Promise(resolve=>{
     if(!dc||dc.bufferedAmount<=threshold)return resolve();
