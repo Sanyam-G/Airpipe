@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site/landing.css?v=20260610a">
+<link rel="stylesheet" href="/site/landing.css?v=20260705e">
 </head>
 <body class="page-dev">
 
@@ -45,22 +45,15 @@
           <li>
             <span class="rm-status next">next</span>
             <div>
-              <strong>Persistent multi-file pairing</strong>
-              <span class="rm-desc">Today the live session ends after the first file. Keeping it open lets the same sender drop a second file without re-pairing.</span>
-            </div>
-          </li>
-          <li>
-            <span class="rm-status next">next</span>
-            <div>
               <strong>Receiver-side accept prompt</strong>
               <span class="rm-desc">One-tap confirmation with the filename and size before saving.</span>
             </div>
           </li>
           <li>
-            <span class="rm-status soon">soon</span>
+            <span class="rm-status next">next</span>
             <div>
-              <strong>Multi-arch Docker image</strong>
-              <span class="rm-desc">The relay image ships <code>linux/amd64</code> today. Adding native <code>arm64</code> helps self-hosters on Apple Silicon and Raspberry Pis.</span>
+              <strong>Resume interrupted transfers</strong>
+              <span class="rm-desc">A dropped connection mid-file means starting over today. Chunk-level resume picks up where it stopped.</span>
             </div>
           </li>
           <li>
@@ -80,15 +73,15 @@
           <li>
             <span class="rm-status later">later</span>
             <div>
-              <strong>Configurable mailbox limits</strong>
-              <span class="rm-desc">The mailbox is hard-coded to 500 MB and 10 minutes today. Self-hosters should be able to set their own.</span>
+              <strong>Storage caps</strong>
+              <span class="rm-desc">A total-bytes ceiling per relay with backpressure on new uploads, so self-hosted relays can't be abused.</span>
             </div>
           </li>
           <li>
             <span class="rm-status later">later</span>
             <div>
-              <strong>Storage caps</strong>
-              <span class="rm-desc">A total-bytes ceiling per relay with backpressure on new uploads, so self-hosted relays can't be abused.</span>
+              <strong>Multi-relay federation</strong>
+              <span class="rm-desc">Self-hosted relays that can hand transfers to each other, so a passphrase works across relay instances.</span>
             </div>
           </li>
         </ul>
@@ -114,6 +107,6 @@
     </div>
   </footer>
 
-  <script src="/site/app.js?v=20260610a" defer></script>
+  <script src="/site/app.js?v=20260704a" defer></script>
 </body>
 </html>

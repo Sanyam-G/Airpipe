@@ -55,7 +55,7 @@ func NewReceiver(relayURL, token string, key []byte) *Receiver {
 // open the room and ping that we're here
 func (r *Receiver) ConnectLive() error {
 	url := fmt.Sprintf("%s/ws/%s", r.relayURL, r.token)
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, _, err := relayDialer.Dial(url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to relay: %w", err)
 	}
@@ -68,7 +68,7 @@ func (r *Receiver) ConnectLive() error {
 
 func (r *Receiver) Connect() error {
 	url := fmt.Sprintf("%s/ws/%s", r.relayURL, r.token)
-	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
+	conn, _, err := relayDialer.Dial(url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to connect to relay: %w", err)
 	}

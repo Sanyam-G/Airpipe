@@ -4,16 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AirPipe — peer-to-peer encrypted file transfer</title>
-<meta name="description" content="Encrypted file transfer, peer-to-peer in the browser. Self-hostable.">
+<meta name="description" content="Encrypted file transfer, peer-to-peer in the browser or terminal. Self-hostable.">
 <meta property="og:title" content="AirPipe">
-<meta property="og:description" content="Encrypted file transfer, peer-to-peer in the browser. Self-hostable.">
+<meta property="og:description" content="Encrypted file transfer, peer-to-peer in the browser or terminal. Self-hostable.">
 <meta property="og:url" content="https://airpipe.sanyamgarg.com">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#14100D">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260510a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site/landing.css?v=20260610a">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/landing.css?v=20260705e">
 </head>
 <body class="page-home">
 
@@ -37,68 +38,150 @@
   <main class="home">
 
     <section class="hero">
-      <div class="hero-copy">
-        <h1>Encrypted file transfer.<br><span class="accent">Peer-to-peer.</span></h1>
-        <p class="hero-sub">AirPipe sends files directly between your devices, encrypted in your browser. The relay never sees what you send.</p>
-        <div class="hero-cta">
-          <a class="btn-primary" href="/live">Send a file →</a>
-          <a class="btn-secondary" href="/send">10-min mailbox</a>
+      <p class="eyebrow">ZERO-KNOWLEDGE FILE TRANSFER</p>
+      <h1 class="hero-h">Any two devices.<br><span class="accent">One passphrase.</span></h1>
+
+      <div class="hero-grid">
+        <div class="hero-side">
+          <p class="hero-sub">Files encrypt before they leave your machine and stream peer-to-peer. The relay pairs the two ends and never sees anything but ciphertext. Terminal or browser, either side.</p>
+          <div class="hero-cta">
+            <a class="btn-primary" href="/live">Send a file →</a>
+            <a class="btn-secondary" href="/send">Leave it in the mailbox</a>
+          </div>
+          <div class="recv-mini">
+            <span class="l-name">RECEIVE · GOT A PASSPHRASE?</span>
+            <div class="recv-line">
+              <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
+              <button id="pp-go" class="recv-go">↵</button>
+            </div>
+            <div id="pp-err" class="recv-err"></div>
+          </div>
+          <div class="hero-meta">
+            <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
+            <span><span class="meta-k">VERSION</span> <span id="relay-version">v4.2.0</span></span>
+            <span><span class="meta-k">LICENSE</span> MIT</span>
+            <span><span class="meta-k">SOURCE</span> <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Sanyam-G/Airpipe</a></span>
+          </div>
         </div>
-        <p class="hero-meta">
-          <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
-          &nbsp;·&nbsp; v4.1.5 &nbsp;·&nbsp; MIT &nbsp;·&nbsp; <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a>
-        </p>
-      </div>
-      <div class="hero-demo">
-        <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The relay only sees encrypted signaling. The file goes directly between sender and receiver.">
-          <g>
-            <rect x="230" y="22" width="140" height="62" rx="10" fill="#221d19" stroke="#ECE6DC" stroke-opacity="0.4" stroke-width="1"/>
-            <text x="300" y="50" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ECE6DC">Relay</text>
-            <text x="300" y="68" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#847C71">encrypted signaling only</text>
-          </g>
-          <g>
-            <rect x="60" y="200" width="170" height="92" rx="10" fill="#221d19" stroke="#ECE6DC" stroke-opacity="0.4" stroke-width="1"/>
-            <text x="145" y="222" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">Sender</text>
-            <rect x="128" y="235" width="34" height="42" rx="2" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
-            <line x1="133" y1="247" x2="157" y2="247" stroke="#ECE6DC" stroke-opacity="0.5"/>
-            <line x1="133" y1="255" x2="155" y2="255" stroke="#ECE6DC" stroke-opacity="0.5"/>
-            <line x1="133" y1="263" x2="152" y2="263" stroke="#ECE6DC" stroke-opacity="0.5"/>
-          </g>
-          <g>
-            <rect x="370" y="200" width="170" height="92" rx="10" fill="#221d19" stroke="#FF4F00" stroke-opacity="0.5" stroke-width="1"/>
-            <text x="455" y="222" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">Receiver</text>
-            <rect x="438" y="235" width="34" height="42" rx="2" fill="none" stroke="#FF4F00" stroke-width="1.4"/>
-            <line x1="443" y1="247" x2="467" y2="247" stroke="#FF4F00" stroke-opacity="0.75"/>
-            <line x1="443" y1="255" x2="465" y2="255" stroke="#FF4F00" stroke-opacity="0.75"/>
-            <line x1="443" y1="263" x2="462" y2="263" stroke="#FF4F00" stroke-opacity="0.75"/>
-          </g>
-          <path d="M 145 200 Q 195 130 250 84" fill="none" stroke="#ECE6DC" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="3 4"/>
-          <path d="M 455 200 Q 405 130 350 84" fill="none" stroke="#ECE6DC" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="3 4"/>
-          <line x1="230" y1="246" x2="370" y2="246" stroke="#FF4F00" stroke-width="2.4"/>
-          <circle cx="230" cy="246" r="4" fill="#FF4F00"/>
-          <circle cx="370" cy="246" r="4" fill="#FF4F00"/>
-          <text x="300" y="240" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">your file</text>
-          <text x="300" y="266" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#FF4F00">peer-to-peer · encrypted</text>
-        </svg>
-        <p class="demo-cap">The relay only sees encrypted handshakes. Your file goes directly between devices.</p>
+
+        <div class="hero-demo">
+          <div class="demo-duo" id="demo-duo">
+            <div class="term pane">
+              <div class="term-bar">
+                <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+                <span class="term-title">airpipe</span>
+                <span class="seg"><button type="button" class="sel" data-view="cli">CLI</button><button type="button" data-view="web">WEB</button></span>
+                <span class="term-role">SENDER</span>
+              </div>
+              <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-s"></span><span class="t-caret" id="caret-s"></span></span>
+<span class="tl t-brand" data-s="s1">     _   _     ___  _
+   /_\ (_)_ _| _ \(_)_ __  ___
+  / _ \| | '_|  _/| | '_ \/ -_)
+ /_/ \_\_|_| |_| |_| .__/\___|
+                   |_|   <span class="t-dim">send</span></span>
+<span class="tl" data-s="s2">  <span class="t-ink">demo.zip</span>  <span class="t-dim">4.2 MB</span></span>
+<span class="tl t-brand" data-s="s3">  ╔══════════════════════════════════════╗
+  ║      RIVER FALCON MARBLE 42          ║
+  ╚══════════════════════════════════════╝</span>
+<span class="tl" data-s="s4">  <span class="t-dim">Or run:</span> <span class="t-ink">airpipe download RIVER FALCON MARBLE 42</span></span>
+<span class="tl" data-s="s5">  <span class="t-dim">Waiting for receiver...</span></span>
+<span class="tl t-ok" data-s="s6">  ✓ Receiver joined</span>
+<span class="tl" data-s="s7">  [<span class="t-brand" id="bar-s">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-s" class="t-dim">  0%</span></span>
+<span class="tl t-ok" data-s="s8">  ✓ Sent demo.zip  <span class="t-dim">direct · WebRTC</span></span></pre>
+              <div class="web-body">
+                <div class="wb-url">airpipe.sanyamgarg.com<span class="wb-path">/live</span></div>
+                <div class="wb-stage">
+                  <div class="wb-head">SEND LIVE</div>
+                  <div class="wl" data-s="s3">
+                    <div class="wb-phrase">RIVER FALCON MARBLE 42</div>
+                    <div class="wb-qr" aria-hidden="true"></div>
+                  </div>
+                  <div class="wl wb-dim" data-s="s5">Waiting for receiver…</div>
+                  <div class="wl wb-ok" data-s="s6">✓ Receiver joined · sending <b>demo.zip</b> · 4.2 MB</div>
+                  <div class="wl" data-s="s7">
+                    <div class="wb-bar"><div class="wb-fill" id="wfill-s"></div></div>
+                    <div class="wb-pct" id="wpct-s">0%</div>
+                  </div>
+                  <div class="wl wb-ok" data-s="s8">✓ Sent demo.zip · direct · WebRTC</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="pipe" id="pipe" aria-hidden="true">
+              <div class="pipe-track"><span class="pkt"></span><span class="pkt"></span><span class="pkt"></span></div>
+              <span class="pipe-cap">E2E&nbsp;ENCRYPTED</span>
+            </div>
+
+            <div class="term pane">
+              <div class="term-bar">
+                <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+                <span class="term-title">airpipe</span>
+                <span class="seg"><button type="button" class="sel" data-view="cli">CLI</button><button type="button" data-view="web">WEB</button></span>
+                <span class="term-role">RECEIVER</span>
+              </div>
+              <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-r"></span><span class="t-caret off" id="caret-r"></span></span>
+<span class="tl t-brand" data-s="r1">     _   _     ___  _
+   /_\ (_)_ _| _ \(_)_ __  ___
+  / _ \| | '_|  _/| | '_ \/ -_)
+ /_/ \_\_|_| |_| |_| .__/\___|
+                   |_|   <span class="t-dim">download</span></span>
+<span class="tl" data-s="r2">  <span class="t-dim">Passphrase:</span> <span class="t-brand">RIVER FALCON MARBLE 42</span>
+  <span class="t-dim">Destination:</span> <span class="t-ink">.</span></span>
+<span class="tl" data-s="r3">  <span class="t-dim">Looking up...</span></span>
+<span class="tl" data-s="r4">  <span class="t-dim">No mailbox transfer; opening direct connection...</span></span>
+<span class="tl" data-s="r5">  [<span class="t-brand" id="bar-r">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-r" class="t-dim">  0%</span></span>
+<span class="tl t-ok" data-s="r6">  ✓ Saved: ./demo.zip  <span class="t-dim">4.2 MB</span></span></pre>
+              <div class="web-body">
+                <div class="wb-url">airpipe.sanyamgarg.com<span class="wb-path">/d/…</span></div>
+                <div class="wb-stage">
+                  <div class="wb-head">RECEIVE</div>
+                  <div class="wl" data-s="r2"><div class="wb-input">RIVER FALCON MARBLE 42</div></div>
+                  <div class="wl wb-dim" data-s="r3">Looking up…</div>
+                  <div class="wl wb-dim" data-s="r4">No mailbox transfer; opening direct connection…</div>
+                  <div class="wl" data-s="r5">
+                    <div class="wb-bar"><div class="wb-fill" id="wfill-r"></div></div>
+                    <div class="wb-pct" id="wpct-r">0%</div>
+                  </div>
+                  <div class="wl wb-ok" data-s="r6">✓ Saved demo.zip · 4.2 MB</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <p class="term-cap">Both sides, live. Flip either side between CLI and WEB. Every pairing works.</p>
+        </div>
       </div>
     </section>
 
-    <section class="recv-row">
-      <div class="recv-label">
-        <span class="l-name">Receive</span>
-        <span class="l-h">Got a passphrase?</span>
+    <section class="how">
+      <div class="how-cell">
+        <span class="how-n">01</span>
+        <div class="how-txt">
+          <h3>Encrypt</h3>
+          <p>NaCl secretbox, in your browser or the CLI. The key is derived from the passphrase or carried in the URL fragment. It never reaches the server.</p>
+        </div>
       </div>
-      <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
-      <button id="pp-go" class="recv-go">Open ↵</button>
-      <div id="pp-err" class="recv-err"></div>
+      <div class="how-cell">
+        <span class="how-n">02</span>
+        <div class="how-txt">
+          <h3>Pair</h3>
+          <p>Scan the QR in the terminal, type four words on this page, or open the link. Both ends derive the same key independently.</p>
+        </div>
+      </div>
+      <div class="how-cell">
+        <span class="how-n">03</span>
+        <div class="how-txt">
+          <h3>Stream</h3>
+          <p>WebRTC punches through NAT and streams device to device. If a firewall blocks it, chunks fall back through the relay, still ciphertext.</p>
+        </div>
+      </div>
     </section>
 
     <section class="selfhost">
-      <div>
+      <div class="sh-copy">
+        <p class="eyebrow">SELF-HOST</p>
         <h2>Run your own relay.</h2>
-        <p>AirPipe is open-source and self-hostable. One command boots a relay you fully control.</p>
-        <p>Point the CLI at it with <code>AIRPIPE_RELAY</code>.</p>
+        <p>One command boots a relay you fully control. Point the CLI at it with <code>AIRPIPE_RELAY</code>.</p>
+        <p>Size cap, expiry, and rate limit are env-configurable. <code>/health</code> and <code>/metrics</code> are built in, and the pages pick up your limits automatically.</p>
         <p class="sh-foot">MIT · <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a></p>
       </div>
       <div class="code-stack">
@@ -112,11 +195,11 @@
       <div class="split-col">
         <h2 class="section-label">Roadmap</h2>
         <ul class="rm-line">
-          <li><span class="rm-status next">next</span>Persistent multi-file pairing</li>
           <li><span class="rm-status next">next</span>Receiver-side accept prompt</li>
-          <li><span class="rm-status soon">soon</span>Multi-arch Docker image</li>
+          <li><span class="rm-status next">next</span>Resume interrupted transfers</li>
           <li><span class="rm-status soon">soon</span>TURN relay for tricky networks</li>
           <li><span class="rm-status later">later</span>LAN device auto-discovery</li>
+          <li><span class="rm-status later">later</span>Per-relay storage caps</li>
         </ul>
         <p class="section-foot"><a href="/development#roadmap">Full roadmap →</a></p>
       </div>
@@ -138,8 +221,93 @@
         <a href="https://github.com/Sanyam-G/Airpipe/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
       </span>
     </div>
+    <div class="footer-word" aria-hidden="true">AIRPIPE</div>
   </footer>
 
-  <script src="/site/app.js?v=20260610a" defer></script>
+  <script src="/site/app.js?v=20260704a" defer></script>
+  <script>
+  (function () {
+    var CMD_S = 'airpipe send demo.zip';
+    var CMD_R = 'airpipe download RIVER FALCON MARBLE 42';
+    var typeS = document.getElementById('type-s'), caretS = document.getElementById('caret-s');
+    var typeR = document.getElementById('type-r'), caretR = document.getElementById('caret-r');
+    var barS = document.getElementById('bar-s'), pctS = document.getElementById('pct-s');
+    var barR = document.getElementById('bar-r'), pctR = document.getElementById('pct-r');
+    var pipe = document.getElementById('pipe');
+    var wfillS = document.getElementById('wfill-s'), wpctS = document.getElementById('wpct-s');
+    var wfillR = document.getElementById('wfill-r'), wpctR = document.getElementById('wpct-r');
+    var lines = Array.prototype.slice.call(document.querySelectorAll('#demo-duo [data-s]'));
+    if (!typeS || !typeR || !lines.length) return;
+    var SIZE_MB = 4.2;
+    var timers = [];
+    function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+    function show(n) {
+      document.querySelectorAll('#demo-duo [data-s="' + n + '"]').forEach(function (el) {
+        el.classList.add('on');
+      });
+    }
+    function setBar(bar, pct, wfill, wpct, p) {
+      var cells = 24, fill = Math.round(cells * p / 100);
+      var mb = (SIZE_MB * p / 100).toFixed(1);
+      bar.textContent = '█'.repeat(fill) + '░'.repeat(cells - fill);
+      pct.textContent = (p < 10 ? '  ' : p < 100 ? ' ' : '') + p + '%  ' + mb + '/' + SIZE_MB + ' MB';
+      wfill.style.width = p + '%';
+      wpct.textContent = p + '% · ' + mb + '/' + SIZE_MB + ' MB';
+    }
+    document.querySelectorAll('#demo-duo .seg button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var pane = b.closest('.pane');
+        pane.classList.toggle('view-web', b.dataset.view === 'web');
+        pane.querySelectorAll('.seg button').forEach(function (x) {
+          x.classList.toggle('sel', x === b);
+        });
+      });
+    });
+    function typeInto(el, caret, cmd, t0, speed) {
+      at(t0, function () { caret.classList.remove('off'); });
+      var t = t0 + 300;
+      for (var i = 0; i < cmd.length; i++) {
+        (function (i) { at(t, function () { el.textContent = cmd.slice(0, i + 1); }); })(i);
+        t += speed + (i % 3) * 14;
+      }
+      return t;
+    }
+    function run() {
+      timers.forEach(clearTimeout); timers = [];
+      typeS.textContent = ''; typeR.textContent = '';
+      caretS.classList.remove('off'); caretR.classList.add('off');
+      pipe.classList.remove('live');
+      lines.forEach(function (l) { l.classList.remove('on'); });
+      setBar(barS, pctS, wfillS, wpctS, 0); setBar(barR, pctR, wfillR, wpctR, 0);
+      var t = typeInto(typeS, caretS, CMD_S, 500, 34);
+      at(t += 250, function () { caretS.classList.add('off'); show('s1'); });
+      at(t += 350, function () { show('s2'); });
+      at(t += 450, function () { show('s3'); });
+      at(t += 250, function () { show('s4'); });
+      at(t += 400, function () { show('s5'); });
+      t = typeInto(typeR, caretR, CMD_R, t + 700, 26);
+      at(t += 200, function () { caretR.classList.add('off'); show('r1'); });
+      at(t += 300, function () { show('r2'); });
+      at(t += 350, function () { show('r3'); });
+      at(t += 550, function () { show('r4'); });
+      at(t += 350, function () { show('s6'); pipe.classList.add('live'); });
+      at(t += 400, function () { show('s7'); show('r5'); });
+      var N = 26;
+      for (var s = 1; s <= N; s++) {
+        var x = s / N;
+        var p = Math.round(100 * (1 - Math.pow(1 - x, 2.2)));
+        (function (p, tt) {
+          at(tt, function () { setBar(barS, pctS, wfillS, wpctS, p); });
+          at(tt + 110, function () { setBar(barR, pctR, wfillR, wpctR, p); });
+        })(p, t);
+        t += 95;
+      }
+      at(t += 320, function () { pipe.classList.remove('live'); show('s8'); });
+      at(t += 200, function () { show('r6'); });
+      at(t + 4500, run);
+    }
+    run();
+  })();
+  </script>
 </body>
 </html>

@@ -125,6 +125,7 @@
   const wrap = document.getElementById('relay-status');
   if (!wrap) return;
   const text = wrap.querySelector('.status-text');
+  const ver = document.getElementById('relay-version');
   function setOnline() {
     wrap.classList.remove('err');
     if (text) text.textContent = 'RELAY ONLINE';
@@ -135,7 +136,14 @@
   }
   function check() {
     fetch('/health', { cache: 'no-store' })
-      .then(function (r) { return r.ok ? setOnline() : setOffline(); })
+      .then(function (r) {
+        if (!r.ok) { setOffline(); return null; }
+        setOnline();
+        return r.json();
+      })
+      .then(function (h) {
+        if (h && ver && /^v\d/.test(h.version || '')) ver.textContent = h.version;
+      })
       .catch(function () { setOffline(); });
   }
   check();

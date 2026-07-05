@@ -78,6 +78,9 @@
     <div class="filename" id="fname">-</div>
     <div class="size-info" id="file-size">-</div>
     <p class="block-sub">If the download didn't trigger automatically, your browser may have blocked multiple downloads. Allow pop-ups for this site or check your downloads folder.</p>
+    <div class="batch-actions hidden" id="save-again-wrap">
+      <button type="button" class="cta cta-primary" id="save-again-btn">Save files again</button>
+    </div>
   </section>
 
   <section id="error" class="block hidden">
@@ -225,7 +228,7 @@ async function runMailbox() {
     $('done-transport').textContent = 'mailbox · async';
     show('complete');
 
-    entries.forEach((ent, idx) => {
+    const saveAll = () => entries.forEach((ent, idx) => {
       setTimeout(() => {
         const blob = new Blob([ent.content]);
         const url = URL.createObjectURL(blob);
@@ -236,6 +239,9 @@ async function runMailbox() {
         setTimeout(() => URL.revokeObjectURL(url), 60000);
       }, idx * 150);
     });
+    $('save-again-wrap').classList.remove('hidden');
+    $('save-again-btn').addEventListener('click', saveAll);
+    saveAll();
   } catch (e) {
     showError(e.message || 'Download failed');
   }

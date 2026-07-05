@@ -23,11 +23,11 @@
 
   <section id="select" class="block">
     <h2>Send files</h2>
-    <p class="block-sub">Encryption happens in your browser. The relay holds the ciphertext for 10 minutes; the receiver decrypts locally with the passphrase.</p>
+    <p class="block-sub" id="select-sub">Encryption happens in your browser. The relay holds the ciphertext for 10 minutes; the receiver decrypts locally with the passphrase.</p>
     <div class="drop-zone" id="dropzone">
       <div class="drop-icon">+</div>
       <div class="drop-label">tap to select or <strong>drop files</strong></div>
-      <div class="drop-hint">any type · up to 500 mb · multiple files = one mailbox bundle</div>
+      <div class="drop-hint" id="drop-hint">any type · up to 500 mb · multiple files = one mailbox bundle</div>
     </div>
     <input type="file" id="fileinput" multiple>
   </section>
@@ -56,7 +56,7 @@
 
     <div class="phrase-display">
       <div class="phrase-words" id="phrase-display" onclick="copyPhrase()">RIVER FALCON MARBLE 42</div>
-      <div class="phrase-hint">tap to copy · expires 10 min</div>
+      <div class="phrase-hint" id="phrase-hint">tap to copy · expires 10 min</div>
     </div>
 
     <div class="qr-wrap" id="qr"></div>
@@ -81,7 +81,7 @@
 </footer>
 
 <script src="/static/nacl-fast.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="/static/qrcode.min.js"></script>
 <script src="/static/words.js"></script>
 <script src="/static/airpipe-protocol.js"></script>
 <script src="/static/airpipe-mailbox.js"></script>
@@ -92,6 +92,17 @@ if(!window.isSecureContext){
   w.textContent='This page needs HTTPS (or localhost) to encrypt files. Put the relay behind a reverse proxy with TLS, or access it locally.';
   document.body.prepend(w);
 }
+// Show the relay's real size cap and expiry, not the default copy.
+fetch('/health').then(r=>r.json()).then(h=>{
+  const mb=h.max_upload_bytes?Math.round(h.max_upload_bytes/1048576):null;
+  const mins=h.expiry_seconds?Math.round(h.expiry_seconds/60):null;
+  if(mb)document.getElementById('drop-hint').textContent='any type · up to '+mb+' mb · multiple files = one mailbox bundle';
+  if(mins){
+    document.getElementById('phrase-hint').textContent='tap to copy · expires '+mins+' min';
+    document.getElementById('select-sub').textContent='Encryption happens in your browser. The relay holds the ciphertext for '+mins+' minutes; the receiver decrypts locally with the passphrase.';
+  }
+}).catch(()=>{});
+
 const dropzone=document.getElementById('dropzone');
 const fileinput=document.getElementById('fileinput');
 
