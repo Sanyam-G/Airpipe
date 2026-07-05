@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site/landing.css?v=20260705d">
+<link rel="stylesheet" href="/site/landing.css?v=20260705e">
 </head>
 <body class="page-home">
 
@@ -48,6 +48,14 @@
             <a class="btn-primary" href="/live">Send a file →</a>
             <a class="btn-secondary" href="/send">Leave it in the mailbox</a>
           </div>
+          <div class="recv-mini">
+            <span class="l-name">RECEIVE · GOT A PASSPHRASE?</span>
+            <div class="recv-line">
+              <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
+              <button id="pp-go" class="recv-go">↵</button>
+            </div>
+            <div id="pp-err" class="recv-err"></div>
+          </div>
           <div class="hero-meta">
             <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
             <span><span class="meta-k">VERSION</span> <span id="relay-version">v4.2.0</span></span>
@@ -58,10 +66,11 @@
 
         <div class="hero-demo">
           <div class="demo-duo" id="demo-duo">
-            <div class="term">
+            <div class="term pane">
               <div class="term-bar">
                 <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
                 <span class="term-title">airpipe</span>
+                <span class="seg"><button type="button" class="sel" data-view="cli">CLI</button><button type="button" data-view="web">WEB</button></span>
                 <span class="term-role">SENDER</span>
               </div>
               <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-s"></span><span class="t-caret" id="caret-s"></span></span>
@@ -79,6 +88,23 @@
 <span class="tl t-ok" data-s="s6">  ✓ Receiver joined</span>
 <span class="tl" data-s="s7">  [<span class="t-brand" id="bar-s">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-s" class="t-dim">  0%</span></span>
 <span class="tl t-ok" data-s="s8">  ✓ Sent demo.zip  <span class="t-dim">direct · WebRTC</span></span></pre>
+              <div class="web-body">
+                <div class="wb-url">airpipe.sanyamgarg.com<span class="wb-path">/live</span></div>
+                <div class="wb-stage">
+                  <div class="wb-head">SEND LIVE</div>
+                  <div class="wl" data-s="s3">
+                    <div class="wb-phrase">RIVER FALCON MARBLE 42</div>
+                    <div class="wb-qr" aria-hidden="true"></div>
+                  </div>
+                  <div class="wl wb-dim" data-s="s5">Waiting for receiver…</div>
+                  <div class="wl wb-ok" data-s="s6">✓ Receiver joined — sending <b>demo.zip</b> · 4.2 MB</div>
+                  <div class="wl" data-s="s7">
+                    <div class="wb-bar"><div class="wb-fill" id="wfill-s"></div></div>
+                    <div class="wb-pct" id="wpct-s">0%</div>
+                  </div>
+                  <div class="wl wb-ok" data-s="s8">✓ Sent demo.zip · direct · WebRTC</div>
+                </div>
+              </div>
             </div>
 
             <div class="pipe" id="pipe" aria-hidden="true">
@@ -86,10 +112,11 @@
               <span class="pipe-cap">E2E&nbsp;ENCRYPTED</span>
             </div>
 
-            <div class="term">
+            <div class="term pane">
               <div class="term-bar">
                 <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
                 <span class="term-title">airpipe</span>
+                <span class="seg"><button type="button" class="sel" data-view="cli">CLI</button><button type="button" data-view="web">WEB</button></span>
                 <span class="term-role">RECEIVER</span>
               </div>
               <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-r"></span><span class="t-caret off" id="caret-r"></span></span>
@@ -104,28 +131,25 @@
 <span class="tl" data-s="r4">  <span class="t-dim">No mailbox transfer; opening direct connection...</span></span>
 <span class="tl" data-s="r5">  [<span class="t-brand" id="bar-r">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-r" class="t-dim">  0%</span></span>
 <span class="tl t-ok" data-s="r6">  ✓ Saved: ./demo.zip  <span class="t-dim">4.2 MB</span></span></pre>
+              <div class="web-body">
+                <div class="wb-url">airpipe.sanyamgarg.com<span class="wb-path">/d/…</span></div>
+                <div class="wb-stage">
+                  <div class="wb-head">RECEIVE</div>
+                  <div class="wl" data-s="r2"><div class="wb-input">RIVER FALCON MARBLE 42</div></div>
+                  <div class="wl wb-dim" data-s="r3">Looking up…</div>
+                  <div class="wl wb-dim" data-s="r4">No mailbox transfer; opening direct connection…</div>
+                  <div class="wl" data-s="r5">
+                    <div class="wb-bar"><div class="wb-fill" id="wfill-r"></div></div>
+                    <div class="wb-pct" id="wpct-r">0%</div>
+                  </div>
+                  <div class="wl wb-ok" data-s="r6">✓ Saved demo.zip · 4.2 MB</div>
+                </div>
+              </div>
             </div>
           </div>
-          <p class="term-cap">Both sides, live. The passphrase is the whole handshake.</p>
+          <p class="term-cap">Both sides, live. Flip either side between CLI and WEB — every pairing works.</p>
         </div>
       </div>
-    </section>
-
-    <div class="ticker" aria-hidden="true">
-      <div class="ticker-track">
-        <span class="ticker-seq">E2E ENCRYPTED&ensp;·&ensp;NACL SECRETBOX&ensp;·&ensp;WEBRTC P2P&ensp;·&ensp;ZERO-KNOWLEDGE RELAY&ensp;·&ensp;SELF-HOSTABLE&ensp;·&ensp;NO ACCOUNTS&ensp;·&ensp;SINGLE GO BINARY&ensp;·&ensp;MIT&ensp;·&ensp;</span>
-        <span class="ticker-seq">E2E ENCRYPTED&ensp;·&ensp;NACL SECRETBOX&ensp;·&ensp;WEBRTC P2P&ensp;·&ensp;ZERO-KNOWLEDGE RELAY&ensp;·&ensp;SELF-HOSTABLE&ensp;·&ensp;NO ACCOUNTS&ensp;·&ensp;SINGLE GO BINARY&ensp;·&ensp;MIT&ensp;·&ensp;</span>
-      </div>
-    </div>
-
-    <section class="recv-row">
-      <div class="recv-label">
-        <span class="l-name">RECEIVE</span>
-        <span class="l-h">Got a passphrase?</span>
-      </div>
-      <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
-      <button id="pp-go" class="recv-go">Open ↵</button>
-      <div id="pp-err" class="recv-err"></div>
     </section>
 
     <section class="how">
@@ -210,21 +234,35 @@
     var barS = document.getElementById('bar-s'), pctS = document.getElementById('pct-s');
     var barR = document.getElementById('bar-r'), pctR = document.getElementById('pct-r');
     var pipe = document.getElementById('pipe');
-    var lines = Array.prototype.slice.call(document.querySelectorAll('#demo-duo .tl[data-s]'));
+    var wfillS = document.getElementById('wfill-s'), wpctS = document.getElementById('wpct-s');
+    var wfillR = document.getElementById('wfill-r'), wpctR = document.getElementById('wpct-r');
+    var lines = Array.prototype.slice.call(document.querySelectorAll('#demo-duo [data-s]'));
     if (!typeS || !typeR || !lines.length) return;
     var SIZE_MB = 4.2;
     var timers = [];
     function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
     function show(n) {
-      var el = document.querySelector('#demo-duo .tl[data-s="' + n + '"]');
-      if (el) el.classList.add('on');
+      document.querySelectorAll('#demo-duo [data-s="' + n + '"]').forEach(function (el) {
+        el.classList.add('on');
+      });
     }
-    function setBar(bar, pct, p) {
+    function setBar(bar, pct, wfill, wpct, p) {
       var cells = 24, fill = Math.round(cells * p / 100);
       var mb = (SIZE_MB * p / 100).toFixed(1);
       bar.textContent = '█'.repeat(fill) + '░'.repeat(cells - fill);
       pct.textContent = (p < 10 ? '  ' : p < 100 ? ' ' : '') + p + '%  ' + mb + '/' + SIZE_MB + ' MB';
+      wfill.style.width = p + '%';
+      wpct.textContent = p + '% · ' + mb + '/' + SIZE_MB + ' MB';
     }
+    document.querySelectorAll('#demo-duo .seg button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var pane = b.closest('.pane');
+        pane.classList.toggle('view-web', b.dataset.view === 'web');
+        pane.querySelectorAll('.seg button').forEach(function (x) {
+          x.classList.toggle('sel', x === b);
+        });
+      });
+    });
     function typeInto(el, caret, cmd, t0, speed) {
       at(t0, function () { caret.classList.remove('off'); });
       var t = t0 + 300;
@@ -240,7 +278,7 @@
       caretS.classList.remove('off'); caretR.classList.add('off');
       pipe.classList.remove('live');
       lines.forEach(function (l) { l.classList.remove('on'); });
-      setBar(barS, pctS, 0); setBar(barR, pctR, 0);
+      setBar(barS, pctS, wfillS, wpctS, 0); setBar(barR, pctR, wfillR, wpctR, 0);
       // Sender types, gets the passphrase, waits.
       var t = typeInto(typeS, caretS, CMD_S, 500, 34);
       at(t += 250, function () { caretS.classList.add('off'); show('s1'); });
@@ -263,8 +301,8 @@
         var x = s / N;
         var p = Math.round(100 * (1 - Math.pow(1 - x, 2.2)));
         (function (p, tt) {
-          at(tt, function () { setBar(barS, pctS, p); });
-          at(tt + 110, function () { setBar(barR, pctR, p); });
+          at(tt, function () { setBar(barS, pctS, wfillS, wpctS, p); });
+          at(tt + 110, function () { setBar(barR, pctR, wfillR, wpctR, p); });
         })(p, t);
         t += 95;
       }
