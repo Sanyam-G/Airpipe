@@ -149,24 +149,23 @@ main > section, main > div, main > header { border-bottom: 1px solid var(--line)
 /* ---------- hero ---------- */
 
 .hero {
-  display: grid;
-  grid-template-columns: 1.02fr 0.98fr;
-  gap: 56px;
-  padding: 84px 28px 72px;
-  align-items: center;
+  padding: 76px 28px 64px;
   position: relative;
   overflow: hidden;
 }
 .hero::before {
   content: '';
   position: absolute;
-  right: -180px;
-  top: -120px;
-  width: 560px;
-  height: 560px;
-  background: radial-gradient(circle, rgba(255, 79, 0, 0.09), transparent 65%);
+  left: 50%;
+  top: 30%;
+  transform: translateX(-50%);
+  width: 720px;
+  height: 720px;
+  background: radial-gradient(circle, rgba(255, 79, 0, 0.07), transparent 65%);
   pointer-events: none;
 }
+
+.hero-copy { max-width: 620px; margin-bottom: 56px; position: relative; }
 
 .hero h1 {
   font-size: clamp(2.5rem, 5.2vw, 3.9rem);
@@ -227,7 +226,66 @@ main > section, main > div, main > header { border-bottom: 1px solid var(--line)
   50% { box-shadow: 0 0 0 5px rgba(111, 191, 115, 0); }
 }
 
-/* ---------- terminal ---------- */
+/* ---------- terminal demo (sender / pipe / receiver) ---------- */
+
+.demo-duo {
+  display: grid;
+  grid-template-columns: 1fr 64px 1fr;
+  align-items: stretch;
+  position: relative;
+}
+
+.pipe {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: 40px; /* visually centers against term bodies, below the bars */
+}
+.pipe-track {
+  width: 100%;
+  height: 2px;
+  position: relative;
+  background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 12px);
+}
+.pkt {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 6px;
+  height: 6px;
+  background: var(--accent);
+  border-radius: 1px;
+  opacity: 0;
+}
+.pipe.live .pkt { animation: pkt 1.1s linear infinite; }
+.pipe.live .pkt:nth-child(2) { animation-delay: 0.36s; }
+.pipe.live .pkt:nth-child(3) { animation-delay: 0.72s; }
+@keyframes pkt {
+  0% { left: 0; opacity: 0; }
+  12% { opacity: 1; }
+  88% { opacity: 1; }
+  100% { left: calc(100% - 6px); opacity: 0; }
+}
+.pipe-cap {
+  position: absolute;
+  top: calc(50% + 34px);
+  font: 600 8.5px/1 var(--mono);
+  letter-spacing: 0.14em;
+  color: var(--mut);
+  white-space: nowrap;
+}
+.pipe.live .pipe-cap { color: var(--accent); }
+
+.term-role {
+  margin-left: auto;
+  font: 600 9px/1 var(--mono);
+  letter-spacing: 0.16em;
+  color: var(--accent);
+  border: 1px solid rgba(255, 79, 0, 0.45);
+  border-radius: 3px;
+  padding: 4px 6px;
+}
 
 .term {
   background: #100D0A;
@@ -255,10 +313,10 @@ main > section, main > div, main > header { border-bottom: 1px solid var(--line)
 }
 
 .term-body {
-  padding: 18px 18px 22px;
-  font: 400 12.5px/1.55 var(--mono);
+  padding: 16px 16px 20px;
+  font: 400 11.5px/1.55 var(--mono);
   color: var(--mut);
-  min-height: 356px;
+  min-height: 318px;
   white-space: pre;
   overflow-x: auto;
 }
@@ -282,10 +340,11 @@ main > section, main > div, main > header { border-bottom: 1px solid var(--line)
 @keyframes blink { 50% { opacity: 0; } }
 
 .term-cap {
-  margin-top: 14px;
+  margin-top: 18px;
   font: 400 12px/1.6 var(--mono);
   color: var(--mut);
   text-align: center;
+  position: relative;
 }
 
 /* ---------- receive strip ---------- */
@@ -552,7 +611,9 @@ main > section, main > div, main > header { border-bottom: 1px solid var(--line)
 /* ---------- responsive ---------- */
 
 @media (max-width: 960px) {
-  .hero { grid-template-columns: 1fr; gap: 44px; padding-top: 56px; }
+  .hero { padding-top: 56px; }
+  .demo-duo { grid-template-columns: 1fr; gap: 18px; }
+  .pipe { display: none; }
   .how { grid-template-columns: 1fr; }
   .how-cell + .how-cell { border-left: none; border-top: 1px solid var(--line); }
   .how-n { margin-bottom: 18px; }
