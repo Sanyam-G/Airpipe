@@ -14,7 +14,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site/landing.css?v=20260705c">
+<link rel="stylesheet" href="/site/landing.css?v=20260705d">
 </head>
 <body class="page-home">
 
@@ -38,30 +38,33 @@
   <main class="home">
 
     <section class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">ZERO-KNOWLEDGE FILE TRANSFER</p>
-        <h1>Any two devices.<br><span class="accent">One passphrase.</span></h1>
-        <p class="hero-sub">Files encrypt before they leave your machine and stream peer-to-peer. The relay pairs the two ends and never sees anything but ciphertext. Terminal or browser, either side.</p>
-        <div class="hero-cta">
-          <a class="btn-primary" href="/live">Send a file →</a>
-          <a class="btn-secondary" href="/send">Leave it in the mailbox</a>
-        </div>
-        <p class="hero-meta">
-          <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
-          <span class="meta-sep">/</span> <span id="relay-version">v4.2.0</span>
-          <span class="meta-sep">/</span> MIT
-          <span class="meta-sep">/</span> <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Sanyam-G/Airpipe</a>
-        </p>
-      </div>
+      <p class="eyebrow">ZERO-KNOWLEDGE FILE TRANSFER</p>
+      <h1 class="hero-h">Any two devices.<br><span class="accent">One passphrase.</span></h1>
 
-      <div class="demo-duo" id="demo-duo">
-        <div class="term">
-          <div class="term-bar">
-            <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
-            <span class="term-title">airpipe</span>
-            <span class="term-role">SENDER</span>
+      <div class="hero-grid">
+        <div class="hero-side">
+          <p class="hero-sub">Files encrypt before they leave your machine and stream peer-to-peer. The relay pairs the two ends and never sees anything but ciphertext. Terminal or browser, either side.</p>
+          <div class="hero-cta">
+            <a class="btn-primary" href="/live">Send a file →</a>
+            <a class="btn-secondary" href="/send">Leave it in the mailbox</a>
           </div>
-          <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-s"></span><span class="t-caret" id="caret-s"></span></span>
+          <div class="hero-meta">
+            <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
+            <span><span class="meta-k">VERSION</span> <span id="relay-version">v4.2.0</span></span>
+            <span><span class="meta-k">LICENSE</span> MIT</span>
+            <span><span class="meta-k">SOURCE</span> <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Sanyam-G/Airpipe</a></span>
+          </div>
+        </div>
+
+        <div class="hero-demo">
+          <div class="demo-duo" id="demo-duo">
+            <div class="term">
+              <div class="term-bar">
+                <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+                <span class="term-title">airpipe</span>
+                <span class="term-role">SENDER</span>
+              </div>
+              <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-s"></span><span class="t-caret" id="caret-s"></span></span>
 <span class="tl t-brand" data-s="s1">     _   _     ___  _
    /_\ (_)_ _| _ \(_)_ __  ___
   / _ \| | '_|  _/| | '_ \/ -_)
@@ -76,20 +79,20 @@
 <span class="tl t-ok" data-s="s6">  ✓ Receiver joined</span>
 <span class="tl" data-s="s7">  [<span class="t-brand" id="bar-s">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-s" class="t-dim">  0%</span></span>
 <span class="tl t-ok" data-s="s8">  ✓ Sent demo.zip  <span class="t-dim">direct · WebRTC</span></span></pre>
-        </div>
+            </div>
 
-        <div class="pipe" id="pipe" aria-hidden="true">
-          <div class="pipe-track"><span class="pkt"></span><span class="pkt"></span><span class="pkt"></span></div>
-          <span class="pipe-cap">E2E&nbsp;ENCRYPTED</span>
-        </div>
+            <div class="pipe" id="pipe" aria-hidden="true">
+              <div class="pipe-track"><span class="pkt"></span><span class="pkt"></span><span class="pkt"></span></div>
+              <span class="pipe-cap">E2E&nbsp;ENCRYPTED</span>
+            </div>
 
-        <div class="term">
-          <div class="term-bar">
-            <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
-            <span class="term-title">airpipe</span>
-            <span class="term-role">RECEIVER</span>
-          </div>
-          <pre class="term-body"><span class="tl t-first" data-s="r0"><span class="t-dim">$</span> <span id="type-r"></span><span class="t-caret off" id="caret-r"></span></span>
+            <div class="term">
+              <div class="term-bar">
+                <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+                <span class="term-title">airpipe</span>
+                <span class="term-role">RECEIVER</span>
+              </div>
+              <pre class="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="type-r"></span><span class="t-caret off" id="caret-r"></span></span>
 <span class="tl t-brand" data-s="r1">     _   _     ___  _
    /_\ (_)_ _| _ \(_)_ __  ___
   / _ \| | '_|  _/| | '_ \/ -_)
@@ -101,10 +104,19 @@
 <span class="tl" data-s="r4">  <span class="t-dim">No mailbox transfer; opening direct connection...</span></span>
 <span class="tl" data-s="r5">  [<span class="t-brand" id="bar-r">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-r" class="t-dim">  0%</span></span>
 <span class="tl t-ok" data-s="r6">  ✓ Saved: ./demo.zip  <span class="t-dim">4.2 MB</span></span></pre>
+            </div>
+          </div>
+          <p class="term-cap">Both sides, live. The passphrase is the whole handshake.</p>
         </div>
       </div>
-      <p class="term-cap">Both sides, live. The passphrase is the whole handshake.</p>
     </section>
+
+    <div class="ticker" aria-hidden="true">
+      <div class="ticker-track">
+        <span class="ticker-seq">E2E ENCRYPTED&ensp;·&ensp;NACL SECRETBOX&ensp;·&ensp;WEBRTC P2P&ensp;·&ensp;ZERO-KNOWLEDGE RELAY&ensp;·&ensp;SELF-HOSTABLE&ensp;·&ensp;NO ACCOUNTS&ensp;·&ensp;SINGLE GO BINARY&ensp;·&ensp;MIT&ensp;·&ensp;</span>
+        <span class="ticker-seq">E2E ENCRYPTED&ensp;·&ensp;NACL SECRETBOX&ensp;·&ensp;WEBRTC P2P&ensp;·&ensp;ZERO-KNOWLEDGE RELAY&ensp;·&ensp;SELF-HOSTABLE&ensp;·&ensp;NO ACCOUNTS&ensp;·&ensp;SINGLE GO BINARY&ensp;·&ensp;MIT&ensp;·&ensp;</span>
+      </div>
+    </div>
 
     <section class="recv-row">
       <div class="recv-label">
@@ -119,23 +131,29 @@
     <section class="how">
       <div class="how-cell">
         <span class="how-n">01</span>
-        <h3>Encrypt</h3>
-        <p>NaCl secretbox, in your browser or the CLI. The key is derived from the passphrase or carried in the URL fragment. It never reaches the server.</p>
+        <div class="how-txt">
+          <h3>Encrypt</h3>
+          <p>NaCl secretbox, in your browser or the CLI. The key is derived from the passphrase or carried in the URL fragment. It never reaches the server.</p>
+        </div>
       </div>
       <div class="how-cell">
         <span class="how-n">02</span>
-        <h3>Pair</h3>
-        <p>Scan the QR in the terminal, type four words on this page, or open the link. Both ends derive the same key independently.</p>
+        <div class="how-txt">
+          <h3>Pair</h3>
+          <p>Scan the QR in the terminal, type four words on this page, or open the link. Both ends derive the same key independently.</p>
+        </div>
       </div>
       <div class="how-cell">
         <span class="how-n">03</span>
-        <h3>Stream</h3>
-        <p>WebRTC punches through NAT and streams device to device. If a firewall blocks it, chunks fall back through the relay, still ciphertext.</p>
+        <div class="how-txt">
+          <h3>Stream</h3>
+          <p>WebRTC punches through NAT and streams device to device. If a firewall blocks it, chunks fall back through the relay, still ciphertext.</p>
+        </div>
       </div>
     </section>
 
     <section class="selfhost">
-      <div>
+      <div class="sh-copy">
         <p class="eyebrow">SELF-HOST</p>
         <h2>Run your own relay.</h2>
         <p>One command boots a relay you fully control. Point the CLI at it with <code>AIRPIPE_RELAY</code>.</p>
@@ -179,6 +197,7 @@
         <a href="https://github.com/Sanyam-G/Airpipe/blob/main/LICENSE" target="_blank" rel="noopener">MIT</a>
       </span>
     </div>
+    <div class="footer-word" aria-hidden="true">AIRPIPE</div>
   </footer>
 
   <script src="/site/app.js?v=20260704a" defer></script>
