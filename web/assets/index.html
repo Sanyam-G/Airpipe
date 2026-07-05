@@ -4,16 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>AirPipe — peer-to-peer encrypted file transfer</title>
-<meta name="description" content="Encrypted file transfer, peer-to-peer in the browser. Self-hostable.">
+<meta name="description" content="Encrypted file transfer, peer-to-peer in the browser or terminal. Self-hostable.">
 <meta property="og:title" content="AirPipe">
-<meta property="og:description" content="Encrypted file transfer, peer-to-peer in the browser. Self-hostable.">
+<meta property="og:description" content="Encrypted file transfer, peer-to-peer in the browser or terminal. Self-hostable.">
 <meta property="og:url" content="https://airpipe.sanyamgarg.com">
 <meta property="og:type" content="website">
+<meta name="theme-color" content="#14100D">
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260510a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/site/landing.css?v=20260610a">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/site/landing.css?v=20260705a">
 </head>
 <body class="page-home">
 
@@ -38,55 +39,50 @@
 
     <section class="hero">
       <div class="hero-copy">
-        <h1>Encrypted file transfer.<br><span class="accent">Peer-to-peer.</span></h1>
-        <p class="hero-sub">AirPipe sends files directly between your devices, encrypted in your browser. The relay never sees what you send.</p>
+        <p class="eyebrow">ZERO-KNOWLEDGE FILE TRANSFER</p>
+        <h1>Any two devices.<br><span class="accent">One passphrase.</span></h1>
+        <p class="hero-sub">Files encrypt before they leave your machine and stream peer-to-peer. The relay pairs the two ends and never sees anything but ciphertext. Terminal or browser, either side.</p>
         <div class="hero-cta">
           <a class="btn-primary" href="/live">Send a file →</a>
-          <a class="btn-secondary" href="/send">10-min mailbox</a>
+          <a class="btn-secondary" href="/send">Leave it in the mailbox</a>
         </div>
         <p class="hero-meta">
           <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
-          &nbsp;·&nbsp; <span id="relay-version">v4.2.0</span> &nbsp;·&nbsp; MIT &nbsp;·&nbsp; <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a>
+          <span class="meta-sep">/</span> <span id="relay-version">v4.2.0</span>
+          <span class="meta-sep">/</span> MIT
+          <span class="meta-sep">/</span> <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Sanyam-G/Airpipe</a>
         </p>
       </div>
-      <div class="hero-demo">
-        <svg viewBox="0 0 600 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet" aria-label="The relay only sees encrypted signaling. The file goes directly between sender and receiver.">
-          <g>
-            <rect x="230" y="22" width="140" height="62" rx="10" fill="#221d19" stroke="#ECE6DC" stroke-opacity="0.4" stroke-width="1"/>
-            <text x="300" y="50" text-anchor="middle" font-family="Inter, sans-serif" font-size="13" font-weight="600" fill="#ECE6DC">Relay</text>
-            <text x="300" y="68" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#847C71">encrypted signaling only</text>
-          </g>
-          <g>
-            <rect x="60" y="200" width="170" height="92" rx="10" fill="#221d19" stroke="#ECE6DC" stroke-opacity="0.4" stroke-width="1"/>
-            <text x="145" y="222" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">Sender</text>
-            <rect x="128" y="235" width="34" height="42" rx="2" fill="none" stroke="#ECE6DC" stroke-width="1.2"/>
-            <line x1="133" y1="247" x2="157" y2="247" stroke="#ECE6DC" stroke-opacity="0.5"/>
-            <line x1="133" y1="255" x2="155" y2="255" stroke="#ECE6DC" stroke-opacity="0.5"/>
-            <line x1="133" y1="263" x2="152" y2="263" stroke="#ECE6DC" stroke-opacity="0.5"/>
-          </g>
-          <g>
-            <rect x="370" y="200" width="170" height="92" rx="10" fill="#221d19" stroke="#FF4F00" stroke-opacity="0.5" stroke-width="1"/>
-            <text x="455" y="222" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">Receiver</text>
-            <rect x="438" y="235" width="34" height="42" rx="2" fill="none" stroke="#FF4F00" stroke-width="1.4"/>
-            <line x1="443" y1="247" x2="467" y2="247" stroke="#FF4F00" stroke-opacity="0.75"/>
-            <line x1="443" y1="255" x2="465" y2="255" stroke="#FF4F00" stroke-opacity="0.75"/>
-            <line x1="443" y1="263" x2="462" y2="263" stroke="#FF4F00" stroke-opacity="0.75"/>
-          </g>
-          <path d="M 145 200 Q 195 130 250 84" fill="none" stroke="#ECE6DC" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="3 4"/>
-          <path d="M 455 200 Q 405 130 350 84" fill="none" stroke="#ECE6DC" stroke-opacity="0.35" stroke-width="1.2" stroke-dasharray="3 4"/>
-          <line x1="230" y1="246" x2="370" y2="246" stroke="#FF4F00" stroke-width="2.4"/>
-          <circle cx="230" cy="246" r="4" fill="#FF4F00"/>
-          <circle cx="370" cy="246" r="4" fill="#FF4F00"/>
-          <text x="300" y="240" text-anchor="middle" font-family="Inter, sans-serif" font-size="12" font-weight="500" fill="#ECE6DC">your file</text>
-          <text x="300" y="266" text-anchor="middle" font-family="Inter, sans-serif" font-size="10" fill="#FF4F00">peer-to-peer · encrypted</text>
-        </svg>
-        <p class="demo-cap">The relay only sees encrypted handshakes. Your file goes directly between devices.</p>
+
+      <div class="hero-term">
+        <div class="term">
+          <div class="term-bar">
+            <span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span>
+            <span class="term-title">sanyam@nexus — airpipe</span>
+          </div>
+          <pre class="term-body" id="term-body"><span class="tl t-first"><span class="t-dim">$</span> <span id="t-type"></span><span class="t-caret" id="t-caret"></span></span>
+<span class="tl t-brand" data-s="1">     _   _     ___  _
+   /_\ (_)_ _| _ \(_)_ __  ___
+  / _ \| | '_|  _/| | '_ \/ -_)
+ /_/ \_\_|_| |_| |_| .__/\___|
+                   |_|   <span class="t-dim">send</span></span>
+<span class="tl" data-s="2">  <span class="t-ink">demo.zip</span>  <span class="t-dim">4.2 MB</span></span>
+<span class="tl t-brand" data-s="3">  ╔══════════════════════════════╗
+  ║   RIVER FALCON MARBLE 42     ║
+  ╚══════════════════════════════╝</span>
+<span class="tl" data-s="4">  <span class="t-dim">Tell them:</span> <span class="t-ink">airpipe.sanyamgarg.com</span></span>
+<span class="tl" data-s="5">  <span class="t-dim">Waiting for receiver...</span></span>
+<span class="tl t-ok" data-s="6">  ✓ Receiver joined</span>
+<span class="tl" data-s="7">  [<span class="t-brand" id="t-bar">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="t-pct" class="t-dim">  0%</span></span>
+<span class="tl t-ok" data-s="8">  ✓ Sent demo.zip  <span class="t-dim">direct · WebRTC · 4.2 MB</span></span></pre>
+        </div>
+        <p class="term-cap">What the sender sees. The receiver scans the QR or types four words.</p>
       </div>
     </section>
 
     <section class="recv-row">
       <div class="recv-label">
-        <span class="l-name">Receive</span>
+        <span class="l-name">RECEIVE</span>
         <span class="l-h">Got a passphrase?</span>
       </div>
       <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
@@ -94,11 +90,30 @@
       <div id="pp-err" class="recv-err"></div>
     </section>
 
+    <section class="how">
+      <div class="how-cell">
+        <span class="how-n">01</span>
+        <h3>Encrypt</h3>
+        <p>NaCl secretbox, in your browser or the CLI. The key is derived from the passphrase or carried in the URL fragment. It never reaches the server.</p>
+      </div>
+      <div class="how-cell">
+        <span class="how-n">02</span>
+        <h3>Pair</h3>
+        <p>Scan the QR in the terminal, type four words on this page, or open the link. Both ends derive the same key independently.</p>
+      </div>
+      <div class="how-cell">
+        <span class="how-n">03</span>
+        <h3>Stream</h3>
+        <p>WebRTC punches through NAT and streams device to device. If a firewall blocks it, chunks fall back through the relay, still ciphertext.</p>
+      </div>
+    </section>
+
     <section class="selfhost">
       <div>
+        <p class="eyebrow">SELF-HOST</p>
         <h2>Run your own relay.</h2>
-        <p>AirPipe is open-source and self-hostable. One command boots a relay you fully control.</p>
-        <p>Point the CLI at it with <code>AIRPIPE_RELAY</code>. Size cap, expiry, and rate limit are env-configurable, and the relay exposes <code>/health</code> and <code>/metrics</code> for monitoring.</p>
+        <p>One command boots a relay you fully control. Point the CLI at it with <code>AIRPIPE_RELAY</code>.</p>
+        <p>Size cap, expiry, and rate limit are env-configurable. <code>/health</code> and <code>/metrics</code> are built in, and the pages pick up your limits automatically.</p>
         <p class="sh-foot">MIT · <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">github.com/Sanyam-G/Airpipe</a></p>
       </div>
       <div class="code-stack">
@@ -141,5 +156,60 @@
   </footer>
 
   <script src="/site/app.js?v=20260704a" defer></script>
+  <script>
+  (function () {
+    var CMD = 'airpipe send demo.zip';
+    var typeEl = document.getElementById('t-type');
+    var caret = document.getElementById('t-caret');
+    var bar = document.getElementById('t-bar');
+    var pct = document.getElementById('t-pct');
+    var lines = Array.prototype.slice.call(document.querySelectorAll('#term-body .tl[data-s]'));
+    if (!typeEl || !lines.length) return;
+    var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var timers = [];
+    function at(ms, fn) { timers.push(setTimeout(fn, ms)); }
+    function showLine(n) {
+      var el = document.querySelector('#term-body .tl[data-s="' + n + '"]');
+      if (el) el.classList.add('on');
+    }
+    function setBar(p) {
+      var cells = 24, fill = Math.round(cells * p / 100);
+      bar.textContent = '█'.repeat(fill) + '░'.repeat(cells - fill);
+      pct.textContent = (p < 10 ? '  ' : p < 100 ? ' ' : '') + p + '%';
+    }
+    function run() {
+      timers.forEach(clearTimeout); timers = [];
+      typeEl.textContent = '';
+      caret.classList.remove('off');
+      lines.forEach(function (l) { l.classList.remove('on'); });
+      setBar(0);
+      if (reduced) {
+        typeEl.textContent = CMD;
+        lines.forEach(function (l) { l.classList.add('on'); });
+        setBar(100);
+        return;
+      }
+      var t = 600;
+      for (var i = 0; i < CMD.length; i++) {
+        (function (i) { at(t, function () { typeEl.textContent = CMD.slice(0, i + 1); }); })(i);
+        t += 34 + (i % 3) * 22;
+      }
+      at(t += 250, function () { caret.classList.add('off'); showLine(1); });
+      at(t += 350, function () { showLine(2); });
+      at(t += 450, function () { showLine(3); showLine(4); });
+      at(t += 500, function () { showLine(5); });
+      at(t += 1400, function () { showLine(6); });
+      at(t += 400, function () { showLine(7); });
+      var steps = [4, 11, 23, 39, 52, 67, 81, 93, 100];
+      for (var s = 0; s < steps.length; s++) {
+        (function (p) { at(t, function () { setBar(p); }); })(steps[s]);
+        t += 210;
+      }
+      at(t += 300, function () { showLine(8); });
+      at(t + 4200, run);
+    }
+    run();
+  })();
+  </script>
 </body>
 </html>
