@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 340" width="920" height="340" font-family="'JetBrains Mono','SFMono-Regular',ui-monospace,monospace" role="img" aria-label="AirPipe: a file streams peer-to-peer from a sender terminal to a receiver terminal via an encrypted passphrase.">
+  <style>
+    text { font-size: 13px; }
+    .dim { fill: #8D8477; }
+    .ink { fill: #ECE6DC; }
+    .acc { fill: #FF4F00; }
+    .ok  { fill: #6FBF73; }
+    .lbl { font-size: 10px; letter-spacing: 1.5px; }
+    .fillbox { transform-box: fill-box; transform-origin: left center; }
+
+    /* one shared 12s clock keeps every element in sync */
+    .a11,.a14,.a18,.a22,.a26,.a37,.a40,.a44,.a48,.a52,.a54,.a84,.a86,
+    .prog,.pipe { animation-duration: 12s; animation-timing-function: linear; animation-iteration-count: infinite; }
+
+    /* steps() = one monospace char per tick, ~35ms/char like the site */
+    .type-s { animation: typeS 12s steps(24,end) infinite; }
+    .type-r { animation: typeR 12s steps(42,end) infinite; }
+    .caret  { animation: blink 1.06s steps(1,end) infinite; }
+    .pkt    { animation: flow 1.1s linear infinite; }
+
+    @keyframes blink { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
+    @keyframes typeS { 0%,2% { transform: scaleX(0) } 9%,100% { transform: scaleX(1) } }
+    @keyframes typeR { 0%,29% { transform: scaleX(0) } 37%,100% { transform: scaleX(1) } }
+    @keyframes prog  { 0%,54% { transform: scaleX(0) } 82%,96% { transform: scaleX(1) } 100% { transform: scaleX(0) } }
+    @keyframes flow  { from { transform: translateX(0) } to { transform: translateX(88px) } }
+    @keyframes pipe  { 0%,50.9% { opacity: 0 } 51%,87% { opacity: 1 } 87.1%,100% { opacity: 0 } }
+
+    .a11 { animation-name: a11 } @keyframes a11 { 0%,10.9% {opacity:0} 11%,96% {opacity:1} 100% {opacity:0} }
+    .a14 { animation-name: a14 } @keyframes a14 { 0%,13.9% {opacity:0} 14%,96% {opacity:1} 100% {opacity:0} }
+    .a18 { animation-name: a18 } @keyframes a18 { 0%,17.9% {opacity:0} 18%,96% {opacity:1} 100% {opacity:0} }
+    .a22 { animation-name: a22 } @keyframes a22 { 0%,21.9% {opacity:0} 22%,96% {opacity:1} 100% {opacity:0} }
+    .a26 { animation-name: a26 } @keyframes a26 { 0%,25.9% {opacity:0} 26%,96% {opacity:1} 100% {opacity:0} }
+    .a37 { animation-name: a37 } @keyframes a37 { 0%,36.9% {opacity:0} 37%,96% {opacity:1} 100% {opacity:0} }
+    .a40 { animation-name: a40 } @keyframes a40 { 0%,39.9% {opacity:0} 40%,96% {opacity:1} 100% {opacity:0} }
+    .a44 { animation-name: a44 } @keyframes a44 { 0%,43.9% {opacity:0} 44%,96% {opacity:1} 100% {opacity:0} }
+    .a48 { animation-name: a48 } @keyframes a48 { 0%,47.9% {opacity:0} 48%,96% {opacity:1} 100% {opacity:0} }
+    .a52 { animation-name: a52 } @keyframes a52 { 0%,51.9% {opacity:0} 52%,96% {opacity:1} 100% {opacity:0} }
+    .a54 { animation-name: a54 } @keyframes a54 { 0%,53.9% {opacity:0} 54%,96% {opacity:1} 100% {opacity:0} }
+    .a84 { animation-name: a84 } @keyframes a84 { 0%,83.9% {opacity:0} 84%,96% {opacity:1} 100% {opacity:0} }
+    .a86 { animation-name: a86 } @keyframes a86 { 0%,85.9% {opacity:0} 86%,96% {opacity:1} 100% {opacity:0} }
+    .pipe { animation-name: pipe }
+    .prog { animation-name: prog }
+  </style>
+
+  <clipPath id="clipS"><rect id="clipSr" class="fillbox type-s" x="38" y="72" width="196" height="20"/></clipPath>
+  <clipPath id="clipR"><rect id="clipRr" class="fillbox type-r" x="528" y="72" width="340" height="20"/></clipPath>
+
+  <rect x="0" y="0" width="920" height="340" rx="14" fill="#14100D"/>
+
+  <!-- ===== SENDER pane ===== -->
+  <g>
+    <rect x="20" y="20" width="390" height="300" rx="12" fill="#100D0A" stroke="rgba(236,230,220,0.12)"/>
+    <circle cx="44" cy="44" r="5" fill="#FF4F00"/><circle cx="60" cy="44" r="5" fill="#221C17"/><circle cx="76" cy="44" r="5" fill="#221C17"/>
+    <text x="94" y="48" class="dim">airpipe</text>
+    <text x="392" y="48" text-anchor="end" class="acc lbl" font-weight="700">SENDER</text>
+    <line x1="20" y1="60" x2="410" y2="60" stroke="rgba(236,230,220,0.07)"/>
+
+    <g clip-path="url(#clipS)">
+      <text x="40" y="86"><tspan class="dim">$ </tspan><tspan class="ink">airpipe send demo.zip</tspan><tspan class="caret ink" font-weight="700">&#9608;</tspan></text>
+    </g>
+    <text x="40" y="112" class="acc a11" font-weight="700">AirPipe &#183; send</text>
+    <text x="40" y="134" class="a14"><tspan class="ink">demo.zip</tspan><tspan class="dim">   4.2 MB</tspan></text>
+    <g class="a18">
+      <rect x="40" y="146" width="300" height="28" rx="6" fill="rgba(255,79,0,0.08)" stroke="#FF4F00"/>
+      <text x="54" y="165" class="acc" font-weight="700" letter-spacing="1">RIVER FALCON MARBLE 42</text>
+    </g>
+    <text x="40" y="196" class="dim a22">Or: airpipe download RIVER FALCON MARBLE 42</text>
+    <text x="40" y="218" class="dim a26">Waiting for receiver&#8230;</text>
+    <text x="40" y="240" class="ok a52">&#10003; Receiver joined</text>
+    <g class="a54">
+      <rect x="40" y="252" width="320" height="9" rx="4.5" fill="#221C17"/>
+      <rect class="fillbox prog" x="40" y="252" width="320" height="9" rx="4.5" fill="#FF4F00"/>
+    </g>
+    <text x="40" y="292" class="ok a84">&#10003; Sent demo.zip &#183; direct &#183; WebRTC</text>
+  </g>
+
+  <!-- ===== pipe ===== -->
+  <g class="pipe">
+    <text x="465" y="150" text-anchor="middle" class="dim lbl">E2E ENCRYPTED</text>
+    <line x1="414" y1="170" x2="506" y2="170" stroke="rgba(236,230,220,0.18)" stroke-width="2" stroke-dasharray="2 5"/>
+    <circle class="pkt fillbox" cx="416" cy="170" r="3.5" fill="#FF4F00"/>
+    <circle class="pkt fillbox" cx="416" cy="170" r="3.5" fill="#FF4F00" style="animation-delay:-0.37s"/>
+    <circle class="pkt fillbox" cx="416" cy="170" r="3.5" fill="#FF4F00" style="animation-delay:-0.73s"/>
+  </g>
+
+  <!-- ===== RECEIVER pane ===== -->
+  <g>
+    <rect x="510" y="20" width="390" height="300" rx="12" fill="#100D0A" stroke="rgba(236,230,220,0.12)"/>
+    <circle cx="534" cy="44" r="5" fill="#FF4F00"/><circle cx="550" cy="44" r="5" fill="#221C17"/><circle cx="566" cy="44" r="5" fill="#221C17"/>
+    <text x="584" y="48" class="dim">airpipe</text>
+    <text x="882" y="48" text-anchor="end" class="acc lbl" font-weight="700">RECEIVER</text>
+    <line x1="510" y1="60" x2="900" y2="60" stroke="rgba(236,230,220,0.07)"/>
+
+    <g clip-path="url(#clipR)">
+      <text x="530" y="86"><tspan class="dim">$ </tspan><tspan class="ink">airpipe download RIVER FALCON MARBLE 42</tspan><tspan class="caret ink" font-weight="700">&#9608;</tspan></text>
+    </g>
+    <text x="530" y="112" class="acc a37" font-weight="700">AirPipe &#183; download</text>
+    <text x="530" y="134" class="a40"><tspan class="dim">Passphrase: </tspan><tspan class="acc">RIVER FALCON MARBLE 42</tspan></text>
+    <text x="530" y="156" class="a40"><tspan class="dim">Destination: </tspan><tspan class="ink">.</tspan></text>
+    <text x="530" y="196" class="dim a44">Looking up&#8230;</text>
+    <text x="530" y="218" class="dim a48">No mailbox transfer; opening direct&#8230;</text>
+    <g class="a54">
+      <rect x="530" y="252" width="320" height="9" rx="4.5" fill="#221C17"/>
+      <rect class="fillbox prog" x="530" y="252" width="320" height="9" rx="4.5" fill="#FF4F00"/>
+    </g>
+    <text x="530" y="292" class="ok a86">&#10003; Saved: ./demo.zip &#183; 4.2 MB</text>
+  </g>
+</svg>

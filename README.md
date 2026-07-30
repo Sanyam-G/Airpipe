@@ -2,7 +2,7 @@
 
 Self-hosted file transfer with a passphrase that works anywhere. Files go peer-to-peer between any two devices. The relay never sees your bytes.
 
-![demo](demo.gif)
+![AirPipe: a file streams peer-to-peer from a sender terminal to a receiver terminal via an encrypted passphrase](demo.svg)
 
 **Try it:** [airpipe.sanyamgarg.com](https://airpipe.sanyamgarg.com)
 
