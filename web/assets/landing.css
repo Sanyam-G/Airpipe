@@ -569,6 +569,9 @@ main > section { border-bottom: 1px solid var(--line); }
 
 .code-stack { display: flex; flex-direction: column; gap: 12px; }
 
+/* grid items must not size to their widest code line */
+.selfhost > *, .hero-grid > *, .demo-duo > *, .how > * { min-width: 0; }
+
 .code-block {
   display: flex;
   align-items: center;
@@ -580,7 +583,7 @@ main > section { border-bottom: 1px solid var(--line); }
   padding: 17px 20px;
   cursor: pointer;
   transition: border-color 0.12s ease;
-  overflow-x: auto;
+  overflow: hidden;
 }
 .code-block:hover { border-color: var(--accent); }
 .code-block code {
@@ -590,6 +593,10 @@ main > section { border-bottom: 1px solid var(--line); }
   font-size: 13px;
   color: var(--ink);
   white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .copy-pill {
   font: 600 10px/1 var(--mono);
