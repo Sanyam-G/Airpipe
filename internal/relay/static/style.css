@@ -103,7 +103,7 @@ a:hover { color: var(--accent); }
 
 @keyframes blink { 50% { opacity: 0.25; } }
 
-.port-btn { color: var(--muted); }
+.port-btn { color: var(--muted); padding: 14px 0; }
 .port-btn:hover { color: var(--accent); text-decoration: none; }
 .port-btn .arrow { font-size: 0.9rem; margin-left: 2px; }
 .gh-btn { display: inline-flex; align-items: center; gap: 8px; }
@@ -375,7 +375,7 @@ a:hover { color: var(--accent); }
   font-weight: 600;
 }
 .drop-hint {
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   color: var(--muted);
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -519,7 +519,7 @@ input[type=file] { display: none; }
   user-select: all;
 }
 .phrase-display .phrase-hint {
-  font-size: 0.6rem;
+  font-size: 0.72rem;
   color: var(--muted);
   letter-spacing: 0.18em;
   text-transform: uppercase;
@@ -1295,3 +1295,13 @@ input[type=file] { display: none; }
   .roadmap-clean { padding: 32px 20px 48px; }
 }
 
+
+/* mobile: env table stacks, 16px inputs stop iOS zoom-on-focus */
+@media (max-width: 540px) {
+  .host-env { grid-template-columns: 1fr; }
+}
+@media (max-width: 720px) {
+  .phrase-input,
+  .hero-phrase .phrase-input,
+  .hero-clean .hero-phrase .phrase-input { font-size: 16px; }
+}
