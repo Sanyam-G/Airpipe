@@ -16,7 +16,7 @@ func printHelp() {
 	b := colorBold
 	r := colorReset
 	d := colorDim
-	fmt.Printf("\n%sairpipe%s — peer-to-peer encrypted file transfer\n\n", b, r)
+	fmt.Printf("\n%sairpipe%s - peer-to-peer encrypted file transfer\n\n", b, r)
 
 	fmt.Printf("%sCommands%s\n", b, r)
 	fmt.Printf("  %ssend%s [--stay-open] [--mode p2p|mailbox] <file> [file2...]\n", b, r)

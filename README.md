@@ -8,17 +8,17 @@ Send a file to any device by sharing a passphrase. It streams straight from one 
 
 ## How it works
 
-The sender picks a file and gets a passphrase like `RIVER FALCON MARBLE 42`. The receiver enters it — on the website, in the terminal (`airpipe download RIVER FALCON MARBLE 42`), or by scanning the QR. The file then transfers directly between the two devices, encrypted the whole way.
+The sender picks a file and gets a passphrase like `RIVER FALCON MARBLE 42`. The receiver enters it on the website, in the terminal (`airpipe download RIVER FALCON MARBLE 42`), or by scanning the QR. The file then transfers directly between the two devices, encrypted the whole way.
 
-If the receiver is offline, the sender can use **mailbox** mode: the relay holds the encrypted file for 10 minutes until it's picked up. Same passphrase either way — the receiver never has to know which mode was used.
+If the receiver is offline, the sender can use **mailbox** mode: the relay holds the encrypted file for 10 minutes until it's picked up. Same passphrase either way. The receiver never has to know which mode was used.
 
 ## Getting past NAT
 
-Two devices on home or office networks usually can't reach each other directly. Each one sits behind a router doing NAT, which drops connections it didn't expect — so neither side can just dial the other.
+Two devices on home or office networks usually can't reach each other directly. Each one sits behind a router doing NAT, which drops connections it didn't expect, so neither side can just dial the other.
 
 AirPipe gets around this the way peer-to-peer normally does. Both devices open an **outbound** connection to the relay (outbound traffic passes through NAT freely), and the relay introduces them. Over that channel they run a short **handshake**, trading their public addresses and candidate routes until they find a path that punches through both NATs. Once it's open the file flows **directly** between them and the relay drops out.
 
-If the NATs are too strict to punch through, the transfer falls back to the relay, which forwards the encrypted bytes blind — it still can't read them.
+If the NATs are too strict to punch through, the transfer falls back to the relay, which forwards the encrypted bytes blind. It still can't read them.
 
 ## Self-host
 
@@ -57,7 +57,7 @@ airpipe receive ./downloads          # wait for someone to send to you; prints a
 
 ## Browser to browser
 
-Open [`/live`](https://airpipe.sanyamgarg.com/live) for a passphrase + QR — no install on either side. The receiver enters it at the homepage and the file transfers between the two browsers.
+Open [`/live`](https://airpipe.sanyamgarg.com/live) for a passphrase + QR, no install on either side. The receiver enters it at the homepage and the file transfers between the two browsers.
 
 ## Encryption
 
