@@ -67,6 +67,10 @@ NaCl secretbox (XSalsa20 + Poly1305, 256-bit), layered on DTLS for the direct pa
 
 Go relay (gorilla/websocket, pion/webrtc), embedded HTML/CSS/JS frontend (tweetnacl.js in the browser), Docker, optional Cloudflare Tunnel. Single static binary.
 
+## Star History
+
+<img alt="Star History Chart" src="https://raw.githubusercontent.com/Sanyam-G/Sanyam-G/main/assets/star-history-airpipe.svg" />
+
 ## License
 
 MIT
