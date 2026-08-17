@@ -226,6 +226,10 @@ func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if s.cfg.MinimalUI {
+		writeStatic(w, "send.html")
+		return
+	}
 	writeFromFS(w, web.FS(), "index.html")
 }
 
@@ -269,20 +273,23 @@ func (s *Server) handleRoomStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	fileCount, bytes := s.fileStore.Stats()
-	rooms := s.roomManager.ActiveRooms()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	body := map[string]any{
 		"status":           "ok",
 		"version":          s.version,
-		"uptime_seconds":   int(time.Since(s.startedAt).Seconds()),
-		"active_files":     fileCount,
-		"active_bytes":     bytes,
-		"active_ws_rooms":  rooms,
 		"protocol_version": int(transfer.ProtocolVersion),
 		"max_upload_bytes": s.cfg.MaxUploadBytes,
 		"expiry_seconds":   int(s.cfg.FileExpiry.Seconds()),
-	})
+	}
+	// Live stats are operator data; hidden unless AIRPIPE_PUBLIC_STATS is set.
+	if s.cfg.PublicStats {
+		fileCount, bytes := s.fileStore.Stats()
+		body["uptime_seconds"] = int(time.Since(s.startedAt).Seconds())
+		body["active_files"] = fileCount
+		body["active_bytes"] = bytes
+		body["active_ws_rooms"] = s.roomManager.ActiveRooms()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(body)
 }
 
 func writeStatic(w http.ResponseWriter, name string) {

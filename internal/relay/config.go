@@ -16,6 +16,8 @@ type Config struct {
 	LogFormat       string
 	MaxUploadBytes  int64
 	FileExpiry      time.Duration
+	MinimalUI       bool
+	PublicStats     bool
 }
 
 func LoadConfig() Config {
@@ -25,6 +27,8 @@ func LoadConfig() Config {
 		LogFormat:       getenv("AIRPIPE_LOG_FORMAT", "json"),
 		MaxUploadBytes:  int64(getenvInt("AIRPIPE_MAX_UPLOAD_MB", 500)) << 20,
 		FileExpiry:      getenvDuration("AIRPIPE_FILE_EXPIRY", 10*time.Minute),
+		MinimalUI:       getenvBool("AIRPIPE_MINIMAL_UI"),
+		PublicStats:     getenvBool("AIRPIPE_PUBLIC_STATS"),
 	}
 	// Only needed for pages served from a different domain; same-origin is always allowed.
 	raw := strings.TrimSpace(os.Getenv("AIRPIPE_ALLOWED_ORIGINS"))
@@ -55,6 +59,14 @@ func getenv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func getenvBool(key string) bool {
+	switch strings.ToLower(os.Getenv(key)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 func getenvInt(key string, fallback int) int {

@@ -10,6 +10,10 @@ import (
 
 // handleMetrics serves Prometheus text format without a client dependency.
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.PublicStats {
+		http.NotFound(w, r)
+		return
+	}
 	fileCount, fileBytes := s.fileStore.Stats()
 	w.Header().Set("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 
