@@ -74,7 +74,6 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
 	mux.HandleFunc("GET /u/{token}", s.handleUploadPage)
 	mux.HandleFunc("GET /live", s.handleLiveSendPage)
-	mux.HandleFunc("GET /live/{token}", s.handleLiveReceivePage)
 	mux.HandleFunc("GET /ws/{token}", s.rateLimit(s.handleWebSocket))
 	mux.HandleFunc("GET /room/{token}", s.rateLimit(s.handleRoomStatus))
 	mux.HandleFunc("GET /health", s.handleHealth)
@@ -210,15 +209,6 @@ func (s *Server) handleUploadPage(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLiveSendPage(w http.ResponseWriter, r *http.Request) {
 	writeStatic(w, "live-send.html")
-}
-
-func (s *Server) handleLiveReceivePage(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-	if token == "" || !validToken.MatchString(token) {
-		http.Error(w, "invalid token", http.StatusBadRequest)
-		return
-	}
-	writeStatic(w, "live-receive.html")
 }
 
 func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
