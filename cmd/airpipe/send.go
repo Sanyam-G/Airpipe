@@ -2,8 +2,7 @@ package main
 
 import (
 	"bufio"
-	"bytes"
-	"encoding/binary"
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,7 +17,7 @@ import (
 )
 
 func cmdSend(relay string, args []string) error {
-	sendFS := newFlagSet("send")
+	sendFS := flag.NewFlagSet("send", flag.ContinueOnError)
 	mode := sendFS.String("mode", "", "p2p | mailbox (default: prompt)")
 	stayOpen := sendFS.Bool("stay-open", false, "after each p2p batch, prompt for more files (requires receiver --stay-open)")
 	if err := sendFS.Parse(args); err != nil {
@@ -160,13 +159,12 @@ func sendMailbox(httpRelay, uploadPath, filename, phrase, derivedToken string, d
 		return fmt.Errorf("read failed: %w", err)
 	}
 
-	fnBytes := []byte(filename)
-	payload := &bytes.Buffer{}
-	binary.Write(payload, binary.BigEndian, uint32(len(fnBytes)))
-	payload.Write(fnBytes)
-	payload.Write(plaintext)
+	payload, err := mailbox.EncodeV1(filename, plaintext)
+	if err != nil {
+		return err
+	}
 
-	ciphertext, err := crypto.Encrypt(payload.Bytes(), derivedKey)
+	ciphertext, err := crypto.Encrypt(payload, derivedKey)
 	if err != nil {
 		return fmt.Errorf("encryption failed: %w", err)
 	}

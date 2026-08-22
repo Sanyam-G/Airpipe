@@ -253,7 +253,7 @@ func simulateWebSender(relayURL, token string, key, fileContent []byte, filename
 	}
 
 	encrypt := func(data []byte) ([]byte, error) {
-		return crypto.EncryptChunk(data, key)
+		return crypto.Encrypt(data, key)
 	}
 
 	// 1. Send version message (0x20 with payload [transfer.ProtocolVersion]).
@@ -434,7 +434,7 @@ func TestWebToCLIWithoutVersion(t *testing.T) {
 	}
 
 	metaJSON := []byte(`{"filename":"test.txt","size":5,"chunks":1}`)
-	encrypted, _ := crypto.EncryptChunk(encode(0x01, metaJSON), key)
+	encrypted, _ := crypto.Encrypt(encode(0x01, metaJSON), key)
 	conn.WriteMessage(websocket.BinaryMessage, encrypted)
 
 	wg.Wait()

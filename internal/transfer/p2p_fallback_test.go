@@ -36,7 +36,7 @@ func writeOneFileWS(t *testing.T, write func(transfer.Message), content []byte, 
 
 func fakeSenderP2PFail(t *testing.T, conn *websocket.Conn, key, content []byte, filename string, sendOffer bool) {
 	write := func(m transfer.Message) {
-		ct, err := crypto.EncryptChunk(transfer.EncodeMessage(m), key)
+		ct, err := crypto.Encrypt(transfer.EncodeMessage(m), key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -54,7 +54,7 @@ func fakeSenderP2PFail(t *testing.T, conn *websocket.Conn, key, content []byte, 
 	}()
 
 	if sendOffer {
-		offerer, err := p2p.NewPeer(p2p.RoleOfferer, p2p.Config{})
+		offerer, err := p2p.NewPeer(p2p.RoleOfferer)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -172,7 +172,7 @@ func TestStayOpen_WS_TwoBatches(t *testing.T) {
 	}
 
 	write := func(m transfer.Message) {
-		ct, err := crypto.EncryptChunk(transfer.EncodeMessage(m), key)
+		ct, err := crypto.Encrypt(transfer.EncodeMessage(m), key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -263,7 +263,7 @@ func TestP2PFail_TwoFilesOverWS(t *testing.T) {
 	}
 
 	write := func(m transfer.Message) {
-		ct, err := crypto.EncryptChunk(transfer.EncodeMessage(m), key)
+		ct, err := crypto.Encrypt(transfer.EncodeMessage(m), key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -352,7 +352,7 @@ func TestReceiverFallback_OwnTimeout(t *testing.T) {
 	defer conn.Close()
 
 	write := func(m transfer.Message) {
-		ct, err := crypto.EncryptChunk(transfer.EncodeMessage(m), key)
+		ct, err := crypto.Encrypt(transfer.EncodeMessage(m), key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -368,7 +368,7 @@ func TestReceiverFallback_OwnTimeout(t *testing.T) {
 		}
 	}()
 
-	offerer, err := p2p.NewPeer(p2p.RoleOfferer, p2p.Config{})
+	offerer, err := p2p.NewPeer(p2p.RoleOfferer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -415,7 +415,7 @@ func TestReceiverFallback_OwnTimeout(t *testing.T) {
 func senderIO(t *testing.T, conn *websocket.Conn, key []byte) (func(transfer.Message), func() transfer.Message) {
 	t.Helper()
 	write := func(m transfer.Message) {
-		ct, err := crypto.EncryptChunk(transfer.EncodeMessage(m), key)
+		ct, err := crypto.Encrypt(transfer.EncodeMessage(m), key)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -429,7 +429,7 @@ func senderIO(t *testing.T, conn *websocket.Conn, key []byte) (func(transfer.Mes
 		if err != nil {
 			t.Fatalf("sender read: %v", err)
 		}
-		pt, err := crypto.DecryptChunk(data, key)
+		pt, err := crypto.Decrypt(data, key)
 		if err != nil {
 			t.Fatal(err)
 		}

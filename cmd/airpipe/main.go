@@ -73,10 +73,6 @@ func main() {
 	}
 }
 
-func newFlagSet(name string) *flag.FlagSet {
-	return flag.NewFlagSet(name, flag.ContinueOnError)
-}
-
 func parseStayOpenFlags(args []string) (stayOpen bool, rest []string) {
 	for _, a := range args {
 		if a == "--stay-open" {

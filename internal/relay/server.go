@@ -283,13 +283,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func writeStatic(w http.ResponseWriter, name string) {
-	content, err := fs.ReadFile(StaticFS(), name)
-	if err != nil {
-		http.Error(w, "page not found", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(content)
+	writeFromFS(w, StaticFS(), name)
 }
 
 func writeFromFS(w http.ResponseWriter, fsys fs.FS, name string) {

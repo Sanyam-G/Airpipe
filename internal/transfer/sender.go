@@ -44,7 +44,7 @@ func (s *Sender) Connect() error {
 	}
 	s.conn = conn
 
-	encryptedVersion, err := crypto.EncryptChunk(EncodeMessage(NewVersionMessage()), s.key)
+	encryptedVersion, err := crypto.Encrypt(EncodeMessage(NewVersionMessage()), s.key)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt version message: %w", err)
 	}
@@ -87,7 +87,7 @@ func (s *Sender) WaitForReceiver(timeout time.Duration) error {
 		return fmt.Errorf("timeout waiting for receiver: %w", err)
 	}
 
-	decrypted, err := crypto.DecryptChunk(message, s.key)
+	decrypted, err := crypto.Decrypt(message, s.key)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt ready message: %w", err)
 	}
@@ -270,7 +270,7 @@ func (s *Sender) streamFile(sendWire func([]byte) error, filePath string, progre
 }
 
 func (s *Sender) writeEncrypted(sendWire func([]byte) error, msg Message) error {
-	enc, err := crypto.EncryptChunk(EncodeMessage(msg), s.key)
+	enc, err := crypto.Encrypt(EncodeMessage(msg), s.key)
 	if err != nil {
 		return err
 	}

@@ -6,17 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/pion/webrtc/v4"
 )
 
-var DefaultICEServers = []webrtc.ICEServer{
+var defaultICEServers = []webrtc.ICEServer{
 	{URLs: []string{"stun:stun.l.google.com:19302"}},
 	{URLs: []string{"stun:stun1.l.google.com:19302"}},
 	{URLs: []string{"stun:stun.cloudflare.com:3478"}},
 }
+
+const backpressureHighMark = 8 << 20
 
 type Role int
 
@@ -25,16 +26,10 @@ const (
 	RoleAnswerer
 )
 
-type Config struct {
-	ICEServers           []webrtc.ICEServer
-	BackpressureHighMark uint64
-}
-
 type Peer struct {
 	pc   *webrtc.PeerConnection
 	dc   *webrtc.DataChannel
 	role Role
-	cfg  Config
 
 	localCandidates chan webrtc.ICECandidateInit
 	dataChannelOpen chan struct{}
@@ -44,21 +39,11 @@ type Peer struct {
 	closeOnce  sync.Once
 	incomingMu sync.Mutex
 	incClosed  bool
-
-	bytesSent     atomic.Int64
-	bytesReceived atomic.Int64
 }
 
-func NewPeer(role Role, cfg Config) (*Peer, error) {
-	if cfg.ICEServers == nil {
-		cfg.ICEServers = DefaultICEServers
-	}
-	if cfg.BackpressureHighMark == 0 {
-		cfg.BackpressureHighMark = 8 << 20
-	}
-
+func NewPeer(role Role) (*Peer, error) {
 	api := webrtc.NewAPI()
-	pc, err := api.NewPeerConnection(webrtc.Configuration{ICEServers: cfg.ICEServers})
+	pc, err := api.NewPeerConnection(webrtc.Configuration{ICEServers: defaultICEServers})
 	if err != nil {
 		return nil, fmt.Errorf("new peer connection: %w", err)
 	}
@@ -66,7 +51,6 @@ func NewPeer(role Role, cfg Config) (*Peer, error) {
 	p := &Peer{
 		pc:              pc,
 		role:            role,
-		cfg:             cfg,
 		localCandidates: make(chan webrtc.ICECandidateInit, 64),
 		dataChannelOpen: make(chan struct{}),
 		incoming:        make(chan []byte, 32),
@@ -120,7 +104,6 @@ func (p *Peer) attachDataChannel(dc *webrtc.DataChannel) {
 		// Pion reuses the buffer between callbacks.
 		data := make([]byte, len(msg.Data))
 		copy(data, msg.Data)
-		p.bytesReceived.Add(int64(len(data)))
 		p.deliver(data)
 	})
 	dc.OnClose(func() {
@@ -219,7 +202,7 @@ func (p *Peer) Send(data []byte) error {
 	if p.dc == nil {
 		return errors.New("datachannel not ready")
 	}
-	for p.dc.BufferedAmount() > p.cfg.BackpressureHighMark {
+	for p.dc.BufferedAmount() > backpressureHighMark {
 		select {
 		case <-time.After(5 * time.Millisecond):
 		case <-p.closed:
@@ -229,7 +212,6 @@ func (p *Peer) Send(data []byte) error {
 	if err := p.dc.Send(data); err != nil {
 		return fmt.Errorf("dc send: %w", err)
 	}
-	p.bytesSent.Add(int64(len(data)))
 	return nil
 }
 
@@ -257,10 +239,6 @@ func (p *Peer) Close() error {
 	})
 	return nil
 }
-
-func (p *Peer) BytesSent() int64 { return p.bytesSent.Load() }
-
-func (p *Peer) BytesReceived() int64 { return p.bytesReceived.Load() }
 
 // WaitDrain blocks until the send buffer is empty, the timeout elapses, or
 // the peer closes. Call before Close() so the Complete message isn't dropped.
