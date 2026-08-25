@@ -99,10 +99,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "room full"))
 		return
 	}
-	defer room.RemoveClient(conn)
+	defer func() {
+		room.RemoveClient(conn)
+		room.mu.Lock()
+		isEmpty := len(room.clients) == 0
+		room.mu.Unlock()
+		if isEmpty {
+			s.roomManager.DeleteRoom(token)
+		}
+	}()
 
 	s.wsConnectionsTotal.Add(1)
-	s.log.Info("client joined room", "token", shortToken(token), "ip", clientIP(r))
+	s.log.Info("client joined room", "token", shortToken(token), "ip", s.clientIP(r))
 
 	for {
 		messageType, message, err := conn.ReadMessage()
@@ -112,13 +120,6 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if messageType == websocket.BinaryMessage {
 			room.Broadcast(conn, message)
 		}
-	}
-
-	room.mu.Lock()
-	isEmpty := len(room.clients) == 0
-	room.mu.Unlock()
-	if isEmpty {
-		s.roomManager.DeleteRoom(token)
 	}
 }
 

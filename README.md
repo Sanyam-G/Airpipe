@@ -39,6 +39,7 @@ Point the CLI at your relay with `export AIRPIPE_RELAY=https://your-server.examp
 | `AIRPIPE_FILE_EXPIRY` | `10m` | Mailbox expiry (Go duration). |
 | `AIRPIPE_MINIMAL_UI` | off | Serve just the send/receive page at `/` instead of the full site. |
 | `AIRPIPE_PUBLIC_STATS` | off | Expose `/metrics` and live stats in `/health` publicly. |
+| `AIRPIPE_TRUST_PROXY_HEADERS` | off | Rate-limit by `Cf-Connecting-Ip` / `X-Forwarded-For`. Set only behind a proxy that strips client-sent copies; required behind a tunnel, or every visitor shares one limit. |
 
 `/health` (JSON) always reports the relay's limits — the web UI reads them from there. Uptime, active-file counts, and Prometheus `/metrics` stay private unless you set `AIRPIPE_PUBLIC_STATS`.
 

@@ -43,15 +43,19 @@ func (il *ipLimiter) allow(ip string) bool {
 	return lim.Allow()
 }
 
-func clientIP(r *http.Request) string {
-	if v := r.Header.Get("Cf-Connecting-Ip"); v != "" {
-		return v
-	}
-	if v := r.Header.Get("X-Forwarded-For"); v != "" {
-		if i := strings.Index(v, ","); i != -1 {
-			return strings.TrimSpace(v[:i])
+// clientIP trusts forwarding headers only when the operator says a proxy sets
+// them; otherwise any client could spoof its way past the per-IP rate limit.
+func (s *Server) clientIP(r *http.Request) string {
+	if s.cfg.TrustProxyHeaders {
+		if v := r.Header.Get("Cf-Connecting-Ip"); v != "" {
+			return v
 		}
-		return strings.TrimSpace(v)
+		if v := r.Header.Get("X-Forwarded-For"); v != "" {
+			if i := strings.Index(v, ","); i != -1 {
+				return strings.TrimSpace(v[:i])
+			}
+			return strings.TrimSpace(v)
+		}
 	}
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -62,7 +66,7 @@ func clientIP(r *http.Request) string {
 
 func (s *Server) rateLimit(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		ip := clientIP(r)
+		ip := s.clientIP(r)
 		if !s.rl.allow(ip) {
 			s.rateLimitedTotal.Add(1)
 			s.log.Warn("rate limited", "ip", ip, "path", r.URL.Path)
