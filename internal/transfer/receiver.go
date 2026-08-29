@@ -79,7 +79,7 @@ func (r *Receiver) Connect() error {
 	if err != nil {
 		return fmt.Errorf("failed to read version message: %w", err)
 	}
-	decryptedVersion, err := crypto.DecryptChunk(versionData, r.key)
+	decryptedVersion, err := crypto.Decrypt(versionData, r.key)
 	if err != nil {
 		return fmt.Errorf("failed to decrypt version message: %w", err)
 	}
@@ -97,7 +97,7 @@ func (r *Receiver) Connect() error {
 	r.conn.SetReadDeadline(time.Time{})
 
 	readyMsg := NewReadyMessage()
-	encryptedReady, err := crypto.EncryptChunk(EncodeMessage(readyMsg), r.key)
+	encryptedReady, err := crypto.Encrypt(EncodeMessage(readyMsg), r.key)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt ready message: %w", err)
 	}
@@ -378,7 +378,7 @@ func (r *Receiver) wsReader() msgReader {
 		if err != nil {
 			return Message{}, err
 		}
-		plaintext, err := crypto.DecryptChunk(encrypted, r.key)
+		plaintext, err := crypto.Decrypt(encrypted, r.key)
 		if err != nil {
 			return Message{}, err
 		}
@@ -393,7 +393,7 @@ func (r *Receiver) peerReader(peer *p2p.Peer) msgReader {
 			if !ok {
 				return Message{}, io.EOF
 			}
-			plaintext, err := crypto.DecryptChunk(data, r.key)
+			plaintext, err := crypto.Decrypt(data, r.key)
 			if err != nil {
 				return Message{}, err
 			}

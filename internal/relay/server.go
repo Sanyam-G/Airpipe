@@ -74,7 +74,6 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
 	mux.HandleFunc("GET /u/{token}", s.handleUploadPage)
 	mux.HandleFunc("GET /live", s.handleLiveSendPage)
-	mux.HandleFunc("GET /live/{token}", s.handleLiveReceivePage)
 	mux.HandleFunc("GET /ws/{token}", s.rateLimit(s.handleWebSocket))
 	mux.HandleFunc("GET /room/{token}", s.rateLimit(s.handleRoomStatus))
 	mux.HandleFunc("GET /health", s.handleHealth)
@@ -100,10 +99,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "room full"))
 		return
 	}
-	defer room.RemoveClient(conn)
+	defer func() {
+		room.RemoveClient(conn)
+		room.mu.Lock()
+		isEmpty := len(room.clients) == 0
+		room.mu.Unlock()
+		if isEmpty {
+			s.roomManager.DeleteRoom(token)
+		}
+	}()
 
 	s.wsConnectionsTotal.Add(1)
-	s.log.Info("client joined room", "token", shortToken(token), "ip", clientIP(r))
+	s.log.Info("client joined room", "token", shortToken(token), "ip", s.clientIP(r))
 
 	for {
 		messageType, message, err := conn.ReadMessage()
@@ -113,13 +120,6 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		if messageType == websocket.BinaryMessage {
 			room.Broadcast(conn, message)
 		}
-	}
-
-	room.mu.Lock()
-	isEmpty := len(room.clients) == 0
-	room.mu.Unlock()
-	if isEmpty {
-		s.roomManager.DeleteRoom(token)
 	}
 }
 
@@ -212,18 +212,13 @@ func (s *Server) handleLiveSendPage(w http.ResponseWriter, r *http.Request) {
 	writeStatic(w, "live-send.html")
 }
 
-func (s *Server) handleLiveReceivePage(w http.ResponseWriter, r *http.Request) {
-	token := r.PathValue("token")
-	if token == "" || !validToken.MatchString(token) {
-		http.Error(w, "invalid token", http.StatusBadRequest)
-		return
-	}
-	writeStatic(w, "live-receive.html")
-}
-
 func (s *Server) handleLandingPage(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
 		http.NotFound(w, r)
+		return
+	}
+	if s.cfg.MinimalUI {
+		writeStatic(w, "send.html")
 		return
 	}
 	writeFromFS(w, web.FS(), "index.html")
@@ -269,30 +264,27 @@ func (s *Server) handleRoomStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
-	fileCount, bytes := s.fileStore.Stats()
-	rooms := s.roomManager.ActiveRooms()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
+	body := map[string]any{
 		"status":           "ok",
 		"version":          s.version,
-		"uptime_seconds":   int(time.Since(s.startedAt).Seconds()),
-		"active_files":     fileCount,
-		"active_bytes":     bytes,
-		"active_ws_rooms":  rooms,
 		"protocol_version": int(transfer.ProtocolVersion),
 		"max_upload_bytes": s.cfg.MaxUploadBytes,
 		"expiry_seconds":   int(s.cfg.FileExpiry.Seconds()),
-	})
+	}
+	// Live stats are operator data; hidden unless AIRPIPE_PUBLIC_STATS is set.
+	if s.cfg.PublicStats {
+		fileCount, bytes := s.fileStore.Stats()
+		body["uptime_seconds"] = int(time.Since(s.startedAt).Seconds())
+		body["active_files"] = fileCount
+		body["active_bytes"] = bytes
+		body["active_ws_rooms"] = s.roomManager.ActiveRooms()
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(body)
 }
 
 func writeStatic(w http.ResponseWriter, name string) {
-	content, err := fs.ReadFile(StaticFS(), name)
-	if err != nil {
-		http.Error(w, "page not found", http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Write(content)
+	writeFromFS(w, StaticFS(), name)
 }
 
 func writeFromFS(w http.ResponseWriter, fsys fs.FS, name string) {

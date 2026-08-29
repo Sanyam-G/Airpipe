@@ -78,6 +78,13 @@ func (fs *FileStore) Store(filename string, r io.Reader, clientToken string) (st
 	}
 
 	fs.mu.Lock()
+	// Re-check under the write lock: two uploads racing the same client token
+	// both pass the RLock precheck above.
+	if _, exists := fs.files[token]; exists {
+		fs.mu.Unlock()
+		os.Remove(tmp.Name())
+		return "", errTokenExists
+	}
 	fs.files[token] = &StoredFile{
 		Path:      tmp.Name(),
 		Filename:  filename,

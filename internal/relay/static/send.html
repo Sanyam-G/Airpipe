@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Send · AirPipe</title>
+<title>Send & receive · AirPipe</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg?v=20260510a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/static/style.css?v=20260510b">
+<link rel="stylesheet" href="/static/style.css?v=20260829a">
 </head>
 <body>
 
@@ -72,6 +72,16 @@
     <div class="filename" id="errmsg">-</div>
   </section>
 
+  <section id="receive" class="block">
+    <h2>Receive files</h2>
+    <p class="block-sub">Got a passphrase from a sender? Type it here.</p>
+    <div class="recv-line">
+      <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
+      <button id="pp-go" class="recv-go">↵</button>
+    </div>
+    <div id="pp-err" class="recv-err"></div>
+  </section>
+
 </main>
 
 <footer class="bottom-strip">
@@ -122,6 +132,8 @@ dropzone.addEventListener('drop',(e)=>{
 function show(id){
   ['select','encrypting','uploading','done','error'].forEach(x=>document.getElementById(x).classList.add('hidden'));
   document.getElementById(id).classList.remove('hidden');
+  // Once a send starts, the receive box gets out of the way.
+  document.getElementById('receive').classList.toggle('hidden',id!=='select');
 }
 
 function showError(msg){show('error');document.getElementById('errmsg').textContent=msg}
@@ -273,6 +285,29 @@ async function handleFiles(filesIn){
     showError(e.message||'Encryption failed');
   }
 }
+
+// Receive: derive token+key from the passphrase, prefer a waiting CLI receiver.
+const ppInput=document.getElementById('pp-input');
+const ppErr=document.getElementById('pp-err');
+async function receiveSubmit(){
+  ppErr.textContent='';
+  const p=ppInput.value.toUpperCase().trim().replace(/\s+/g,' ');
+  if(!p||p.length<5){ppErr.textContent='enter the passphrase';return}
+  if(!crypto||!crypto.subtle){ppErr.textContent='browser missing crypto.subtle (needs HTTPS or localhost)';return}
+  const t=await sha256('airpipe:token:'+p);
+  const k=await sha256('airpipe:key:'+p);
+  const rt=await sha256('airpipe:receive-token:'+p);
+  try{
+    const room=await fetch('/room/'+hexEncode(rt.slice(0,8)));
+    if(room.ok&&(await room.json()).waiting){
+      location.href='/u/'+hexEncode(rt.slice(0,8))+'#'+b64encode(k);
+      return;
+    }
+  }catch(e){}
+  location.href='/d/'+hexEncode(t.slice(0,8))+'#'+b64encode(k);
+}
+document.getElementById('pp-go').addEventListener('click',receiveSubmit);
+ppInput.addEventListener('keydown',e=>{if(e.key==='Enter')receiveSubmit()});
 </script>
 </body>
 </html>

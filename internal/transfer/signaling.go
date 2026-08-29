@@ -18,7 +18,7 @@ const NegotiateTimeout = 15 * time.Second
 var ErrPeerP2PFail = errors.New("peer p2p fail")
 
 func writeSignalMsg(conn *websocket.Conn, key []byte, msg Message) error {
-	encrypted, err := crypto.EncryptChunk(EncodeMessage(msg), key)
+	encrypted, err := crypto.Encrypt(EncodeMessage(msg), key)
 	if err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func readSignalMsg(conn *websocket.Conn, key []byte) (Message, error) {
 	if err != nil {
 		return Message{}, err
 	}
-	decrypted, err := crypto.DecryptChunk(raw, key)
+	decrypted, err := crypto.Decrypt(raw, key)
 	if err != nil {
 		return Message{}, fmt.Errorf("decrypt signal: %w", err)
 	}
@@ -66,7 +66,7 @@ func negotiateSender(ctx context.Context, conn *websocket.Conn, key []byte) (*p2
 	negCtx, cancel := context.WithTimeout(ctx, NegotiateTimeout)
 	defer cancel()
 
-	peer, err := p2p.NewPeer(p2p.RoleOfferer, p2p.Config{})
+	peer, err := p2p.NewPeer(p2p.RoleOfferer)
 	if err != nil {
 		return nil, err
 	}
@@ -152,7 +152,7 @@ func negotiateReceiver(ctx context.Context, conn *websocket.Conn, key []byte, of
 	negCtx, cancel := context.WithTimeout(ctx, NegotiateTimeout)
 	defer cancel()
 
-	peer, err := p2p.NewPeer(p2p.RoleAnswerer, p2p.Config{})
+	peer, err := p2p.NewPeer(p2p.RoleAnswerer)
 	if err != nil {
 		return nil, nil, nil, err
 	}

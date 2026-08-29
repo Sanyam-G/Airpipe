@@ -31,7 +31,12 @@ func testConfig() Config {
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
-	s, err := New(context.Background(), testConfig(), newTestLogger(), "test")
+	return newTestServerWithConfig(t, testConfig())
+}
+
+func newTestServerWithConfig(t *testing.T, cfg Config) *Server {
+	t.Helper()
+	s, err := New(context.Background(), cfg, newTestLogger(), "test")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,10 +194,27 @@ func TestHealthEndpoint(t *testing.T) {
 	if _, ok := body["expiry_seconds"]; !ok {
 		t.Fatal("health missing expiry_seconds field")
 	}
+	if _, ok := body["active_files"]; ok {
+		t.Fatal("health leaks stats without PublicStats")
+	}
+}
+
+func TestMetricsHiddenByDefault(t *testing.T) {
+	s := newTestServer(t)
+
+	req := httptest.NewRequest("GET", "/metrics", nil)
+	w := httptest.NewRecorder()
+	s.Routes().ServeHTTP(w, req)
+
+	if w.Code != 404 {
+		t.Fatalf("expected 404 without PublicStats, got %d", w.Code)
+	}
 }
 
 func TestMetricsEndpoint(t *testing.T) {
-	s := newTestServer(t)
+	cfg := testConfig()
+	cfg.PublicStats = true
+	s := newTestServerWithConfig(t, cfg)
 
 	req := httptest.NewRequest("GET", "/metrics", nil)
 	w := httptest.NewRecorder()
@@ -212,6 +234,23 @@ func TestMetricsEndpoint(t *testing.T) {
 		if !strings.Contains(body, want) {
 			t.Errorf("metrics missing %s", want)
 		}
+	}
+}
+
+func TestMinimalUILanding(t *testing.T) {
+	cfg := testConfig()
+	cfg.MinimalUI = true
+	s := newTestServerWithConfig(t, cfg)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	w := httptest.NewRecorder()
+	s.Routes().ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "pp-input") {
+		t.Fatal("minimal landing missing receive box")
 	}
 }
 
