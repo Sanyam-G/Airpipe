@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sanyamgarg/airpipe/internal/crypto"
-	"github.com/sanyamgarg/airpipe/internal/qr"
+	"github.com/Sanyam-G/Airpipe/v5/internal/crypto"
+	"github.com/Sanyam-G/Airpipe/v5/internal/qr"
 )
 
 // ANSI escape codes

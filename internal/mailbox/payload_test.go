@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/sanyamgarg/airpipe/internal/mailbox"
+	"github.com/Sanyam-G/Airpipe/v5/internal/mailbox"
 )
 
 // Canonical fixtures pinning the wire format. The same hex strings live in

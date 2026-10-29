@@ -13,9 +13,9 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
+	"github.com/Sanyam-G/Airpipe/v5/web"
 	"github.com/gorilla/websocket"
-	"github.com/sanyamgarg/airpipe/internal/transfer"
-	"github.com/sanyamgarg/airpipe/web"
 )
 
 var validToken = regexp.MustCompile(`^[0-9a-f]{16}$`)

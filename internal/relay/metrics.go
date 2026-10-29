@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sanyamgarg/airpipe/internal/transfer"
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 )
 
 // handleMetrics serves Prometheus text format without a client dependency.

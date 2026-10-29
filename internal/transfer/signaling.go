@@ -8,9 +8,9 @@ import (
 	"io"
 	"time"
 
+	"github.com/Sanyam-G/Airpipe/v5/internal/crypto"
+	"github.com/Sanyam-G/Airpipe/v5/internal/p2p"
 	"github.com/gorilla/websocket"
-	"github.com/sanyamgarg/airpipe/internal/crypto"
-	"github.com/sanyamgarg/airpipe/internal/p2p"
 )
 
 const NegotiateTimeout = 15 * time.Second

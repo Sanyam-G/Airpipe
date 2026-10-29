@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Sanyam-G/Airpipe/v5/internal/crypto"
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 	"github.com/gorilla/websocket"
-	"github.com/sanyamgarg/airpipe/internal/crypto"
-	"github.com/sanyamgarg/airpipe/internal/transfer"
 )
 
 // Minimal relay that broadcasts between two clients in a room.

@@ -1,4 +1,4 @@
-module github.com/sanyamgarg/airpipe
+module github.com/Sanyam-G/Airpipe/v5
 
 go 1.25.0
 

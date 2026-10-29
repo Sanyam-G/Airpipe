@@ -25,11 +25,11 @@ type Config struct {
 
 func LoadConfig() Config {
 	c := Config{
-		Port:            getenv("PORT", "8080"),
-		RateLimitPerMin: getenvInt("AIRPIPE_RATE_LIMIT_PER_MIN", 60),
-		LogFormat:       getenv("AIRPIPE_LOG_FORMAT", "json"),
-		MaxUploadBytes:  int64(getenvInt("AIRPIPE_MAX_UPLOAD_MB", 500)) << 20,
-		FileExpiry:      getenvDuration("AIRPIPE_FILE_EXPIRY", 10*time.Minute),
+		Port:              getenv("PORT", "8080"),
+		RateLimitPerMin:   getenvInt("AIRPIPE_RATE_LIMIT_PER_MIN", 60),
+		LogFormat:         getenv("AIRPIPE_LOG_FORMAT", "json"),
+		MaxUploadBytes:    int64(getenvInt("AIRPIPE_MAX_UPLOAD_MB", 500)) << 20,
+		FileExpiry:        getenvDuration("AIRPIPE_FILE_EXPIRY", 10*time.Minute),
 		MinimalUI:         getenvBool("AIRPIPE_MINIMAL_UI"),
 		PublicStats:       getenvBool("AIRPIPE_PUBLIC_STATS"),
 		TrustProxyHeaders: getenvBool("AIRPIPE_TRUST_PROXY_HEADERS"),

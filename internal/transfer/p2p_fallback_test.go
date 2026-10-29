@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Sanyam-G/Airpipe/v5/internal/crypto"
+	"github.com/Sanyam-G/Airpipe/v5/internal/p2p"
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 	"github.com/gorilla/websocket"
-	"github.com/sanyamgarg/airpipe/internal/crypto"
-	"github.com/sanyamgarg/airpipe/internal/p2p"
-	"github.com/sanyamgarg/airpipe/internal/transfer"
 )
 
 func writeOneFileWS(t *testing.T, write func(transfer.Message), content []byte, filename string) {
