@@ -38,6 +38,9 @@ func cmdSend(relay string, args []string) error {
 			anyDir = true
 		}
 	}
+	if err := checkRelay(relay); err != nil {
+		return err
+	}
 	resolvedMode, err := resolveMode(*mode)
 	if err != nil {
 		return err

@@ -10,6 +10,9 @@ import (
 )
 
 func cmdReceive(relay, destDir string, stayOpen bool) error {
+	if err := checkRelay(relay); err != nil {
+		return err
+	}
 	phrase := passphrase.Generate()
 	secrets := passphrase.Derive(phrase)
 	token := secrets.ReceiveToken

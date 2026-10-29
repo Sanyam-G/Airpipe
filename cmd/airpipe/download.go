@@ -28,6 +28,9 @@ func cmdDownload(relay string, args []string) error {
 		}
 	}
 
+	if err := checkRelay(relay); err != nil {
+		return err
+	}
 	phrase := strings.Join(phraseArgs, " ")
 	secrets := passphrase.Derive(phrase)
 	derivedToken := secrets.Token

@@ -26,7 +26,9 @@ const (
 )
 
 // v3: multi-file batches + SessionEnd. A v2 receiver exits after the first Complete, so mixed versions must fail closed here.
-const ProtocolVersion byte = 3
+// v4 (AirPipe v5): PBKDF2 passphrase derivation and 32-hex tokens. Older clients land in
+// different rooms, so the relay turns them away and the CLI checks /health before starting.
+const ProtocolVersion byte = 4
 
 type Metadata struct {
 	Filename string `json:"filename"`
