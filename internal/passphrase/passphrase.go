@@ -1,6 +1,8 @@
 package passphrase
 
 import (
+	"crypto/hkdf"
+	"crypto/pbkdf2"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -34,22 +36,39 @@ func Normalize(phrase string) string {
 	return strings.Join(fields, " ")
 }
 
-// DeriveToken returns a 16-char hex token derived from the passphrase.
-// Uses SHA-256 with a domain-separated prefix, takes the first 8 bytes.
-func DeriveToken(phrase string) string {
-	h := sha256.Sum256([]byte("airpipe:token:" + Normalize(phrase)))
-	return hex.EncodeToString(h[:8])
+// KDF parameters. Changing any of them changes every token and key, which
+// breaks compatibility with other clients: bump transfer.ProtocolVersion too.
+const (
+	kdfSalt       = "airpipe/v5/kdf"
+	KDFIterations = 600_000
+)
+
+// Secrets is everything a transfer needs from its passphrase.
+type Secrets struct {
+	Token        string   // room and mailbox token for a sender's transfer
+	ReceiveToken string   // room token an `airpipe receive` waits on
+	Key          [32]byte // NaCl secretbox key
 }
 
-// DeriveReceiveToken returns the room token a receiver waits on. Separate
-// domain from DeriveToken so the landing resolver can route /u/ vs /d/.
-func DeriveReceiveToken(phrase string) string {
-	h := sha256.Sum256([]byte("airpipe:receive-token:" + Normalize(phrase)))
-	return hex.EncodeToString(h[:8])
-}
-
-// DeriveKey returns a 32-byte NaCl secretbox key derived from the passphrase.
-// Uses SHA-256 with a domain-separated prefix.
-func DeriveKey(phrase string) [32]byte {
-	return sha256.Sum256([]byte("airpipe:key:" + Normalize(phrase)))
+// Derive runs PBKDF2-HMAC-SHA256 once over the normalized passphrase, then
+// splits the result with HKDF labels so the tokens the relay sees reveal
+// nothing about the key beyond the passphrase itself. It is slow on purpose:
+// call it once per transfer and keep the result.
+func Derive(phrase string) Secrets {
+	master, err := pbkdf2.Key(sha256.New, Normalize(phrase), []byte(kdfSalt), KDFIterations, 32)
+	if err != nil {
+		panic("pbkdf2: " + err.Error())
+	}
+	expand := func(label string, n int) []byte {
+		b, err := hkdf.Key(sha256.New, master, nil, label, n)
+		if err != nil {
+			panic("hkdf: " + err.Error())
+		}
+		return b
+	}
+	var s Secrets
+	copy(s.Key[:], expand("airpipe/v5/key", 32))
+	s.Token = hex.EncodeToString(expand("airpipe/v5/token", 16))
+	s.ReceiveToken = hex.EncodeToString(expand("airpipe/v5/receive-token", 16))
+	return s
 }

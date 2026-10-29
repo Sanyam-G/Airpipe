@@ -277,8 +277,8 @@ func TestFileStoreRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
-	if len(token) != 16 {
-		t.Fatalf("expected 16 char token, got %d: %s", len(token), token)
+	if len(token) != 32 {
+		t.Fatalf("expected 32 char token, got %d: %s", len(token), token)
 	}
 
 	sf, ok := fs.Get(token)
@@ -486,7 +486,7 @@ func TestConfigBadEnvFallsBack(t *testing.T) {
 
 func TestRoomStatusEndpoint(t *testing.T) {
 	s := newTestServer(t)
-	token := "00112233aabbccdd"
+	token := "00112233aabbccdd00112233aabbccdd"
 
 	check := func(path string, wantStatus int, wantWaiting bool) {
 		t.Helper()

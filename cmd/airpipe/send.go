@@ -89,9 +89,9 @@ func cmdSend(relay string, args []string) error {
 	}
 
 	phrase := passphrase.Generate()
-	derivedToken := passphrase.DeriveToken(phrase)
-	derivedKeyArr := passphrase.DeriveKey(phrase)
-	derivedKey := derivedKeyArr[:]
+	secrets := passphrase.Derive(phrase)
+	derivedToken := secrets.Token
+	derivedKey := secrets.Key[:]
 
 	if *stayOpen && resolvedMode != "p2p" {
 		return fmt.Errorf("--stay-open is only supported in p2p mode (--mode p2p)")

@@ -18,7 +18,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-var validToken = regexp.MustCompile(`^[0-9a-f]{16}$`)
+var validToken = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
 type Server struct {
 	cfg         Config

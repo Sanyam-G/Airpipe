@@ -29,8 +29,9 @@ func cmdDownload(relay string, args []string) error {
 	}
 
 	phrase := strings.Join(phraseArgs, " ")
-	derivedToken := passphrase.DeriveToken(phrase)
-	derivedKey := passphrase.DeriveKey(phrase)
+	secrets := passphrase.Derive(phrase)
+	derivedToken := secrets.Token
+	derivedKey := secrets.Key
 
 	banner("download")
 	fmt.Printf("  Passphrase: %s%s%s\n", colorBrand, passphrase.Normalize(phrase), colorReset)

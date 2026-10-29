@@ -11,9 +11,9 @@ import (
 
 func cmdReceive(relay, destDir string, stayOpen bool) error {
 	phrase := passphrase.Generate()
-	token := passphrase.DeriveReceiveToken(phrase)
-	keyArr := passphrase.DeriveKey(phrase)
-	key := keyArr[:]
+	secrets := passphrase.Derive(phrase)
+	token := secrets.ReceiveToken
+	key := secrets.Key[:]
 
 	wsRelay := toWS(relay)
 	httpRelay := toHTTP(relay)

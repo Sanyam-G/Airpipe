@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>airpipe · KDF self-check</title>
+<style>
+  body{background:#1B1714;color:#ECE6DC;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;margin:24px;max-width:900px;word-break:break-all}
+  .pass{color:#7AC74F}
+  .fail{color:#FF4F00;font-weight:600}
+</style>
+</head>
+<body>
+<h1>KDF self-check</h1>
+<p style="opacity:0.7">Runs deriveSecrets from airpipe-protocol.js against the vectors pinned in <code>internal/passphrase/passphrase_test.go</code> and shows how long each derivation takes on this device.</p>
+<pre id="out">running…</pre>
+<script src="/static/airpipe-protocol.js"></script>
+<script>
+const vectors=[
+  ["  river falcon\tmarble 42 ","95662f2cc42823ab1ff21ca9e81b886d","f46edda0efefcd42cf1887ec5ab36df5","43273724277857759978acee2bb0f0eb14773b45175f4783cadaa66588633791"],
+  ["OCEAN TIGER STORM 77","c7bbb4eb021f118a9603cbdaaa38995d","a38edfee5691dae8d263d878dcf0c28a","fda61134b1a26b913fee5625dc3300e6c1600f7f8133dd9d222141b34c81db67"],
+];
+(async()=>{
+  const out=document.getElementById('out');
+  const lines=[];
+  let ok=true;
+  for(const [phrase,token,recv,key] of vectors){
+    const t0=performance.now();
+    const s=await deriveSecrets(phrase);
+    const ms=Math.round(performance.now()-t0);
+    const k=Array.from(s.key,x=>x.toString(16).padStart(2,'0')).join('');
+    const pass=s.token===token&&s.receiveToken===recv&&k===key;
+    ok=ok&&pass;
+    lines.push((pass?'PASS':'FAIL')+' '+JSON.stringify(phrase)+' '+ms+' ms'+(pass?'':'\n  got '+s.token+' '+s.receiveToken+' '+k));
+  }
+  out.className=ok?'pass':'fail';
+  out.textContent=lines.join('\n')+'\n'+(ok?'ALL PASS':'MISMATCH');
+  document.body.dataset.result=ok?'pass':'fail';
+})().catch(e=>{document.getElementById('out').textContent='error: '+e;document.body.dataset.result='error'});
+</script>
+</body>
+</html>
