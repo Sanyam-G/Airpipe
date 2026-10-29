@@ -20,6 +20,13 @@ import (
 
 var validToken = regexp.MustCompile(`^[0-9a-f]{32}$`)
 
+// Clients before AirPipe v5 derive 16-hex tokens with a fast hash. They can't
+// pair with v5 clients, so the relay tells them to update instead of letting them wait.
+var legacyToken = regexp.MustCompile(`^[0-9a-f]{16}$`)
+
+// Sent as a WebSocket close reason, so it must stay under 123 bytes.
+const legacyClientMsg = "This relay runs AirPipe v5 and your client is older. Update with: airpipe update (or brew upgrade airpipe)"
+
 type Server struct {
 	cfg         Config
 	log         *slog.Logger
@@ -94,6 +101,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	if legacyToken.MatchString(token) {
+		// Old clients only print errors read from an open socket, so close with
+		// the reason and wait for their close reply before dropping TCP.
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, legacyClientMsg))
+		conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+		for {
+			if _, _, err := conn.ReadMessage(); err != nil {
+				return
+			}
+		}
+	}
+
 	room := s.roomManager.GetOrCreateRoom(token)
 	if !room.AddClient(conn) {
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "room full"))
@@ -134,6 +153,10 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	defer file.Close()
 
 	clientToken := r.FormValue("token")
+	if legacyToken.MatchString(clientToken) {
+		http.Error(w, legacyClientMsg, http.StatusUpgradeRequired)
+		return
+	}
 	if clientToken != "" && !validToken.MatchString(clientToken) {
 		http.Error(w, "invalid token format", http.StatusBadRequest)
 		return

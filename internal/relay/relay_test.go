@@ -524,3 +524,35 @@ func TestRoomStatusEndpoint(t *testing.T) {
 
 	s.roomManager.DeleteRoom(token)
 }
+
+func TestLegacyClientsGetUpdateMessage(t *testing.T) {
+	s := newTestServer(t)
+	srv := httptest.NewServer(s.Routes())
+	defer srv.Close()
+	legacy := "00112233aabbccdd"
+
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	mw.WriteField("token", legacy)
+	part, _ := mw.CreateFormFile("file", "encrypted.bin")
+	part.Write([]byte("x"))
+	mw.Close()
+	resp, err := http.Post(srv.URL+"/upload", mw.FormDataContentType(), body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUpgradeRequired || !strings.Contains(string(msg), "airpipe update") {
+		t.Fatalf("legacy upload: %d %q", resp.StatusCode, msg)
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+srv.URL[4:]+"/ws/"+legacy, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, _, err := conn.ReadMessage(); err == nil || !strings.Contains(err.Error(), "airpipe update") {
+		t.Fatalf("legacy ws: %v", err)
+	}
+}
