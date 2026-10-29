@@ -1,6 +1,6 @@
 # AirPipe
 
-Send a file to any device by sharing a passphrase. It streams straight from one machine to the other, encrypted end to end. The relay that connects the two ends never sees your bytes.
+Send a file to any device by sharing a passphrase. It streams straight from one machine to the other, encrypted end to end. The relay that connects the two ends only handles encrypted data.
 
 ![AirPipe: a file streams peer-to-peer from a sender terminal to a receiver terminal via an encrypted passphrase](demo.svg)
 
@@ -18,7 +18,7 @@ Two devices on home or office networks usually can't reach each other directly. 
 
 AirPipe gets around this the way peer-to-peer normally does. Both devices open an **outbound** connection to the relay (outbound traffic passes through NAT freely), and the relay introduces them. Over that channel they run a short **handshake**, trading their public addresses and candidate routes until they find a path that punches through both NATs. Once it's open the file flows **directly** between them and the relay drops out.
 
-If the NATs are too strict to punch through, the transfer falls back to the relay, which forwards the encrypted bytes blind. It still can't read them.
+If the NATs are too strict to punch through, the transfer falls back to the relay, which forwards the encrypted bytes. They stay encrypted with the key derived from the passphrase.
 
 ## Self-host
 
@@ -41,15 +41,19 @@ Point the CLI at your relay with `export AIRPIPE_RELAY=https://your-server.examp
 | `AIRPIPE_PUBLIC_STATS` | off | Expose `/metrics` and live stats in `/health` publicly. |
 | `AIRPIPE_TRUST_PROXY_HEADERS` | off | Rate-limit by `Cf-Connecting-Ip` / `X-Forwarded-For`. Set only behind a proxy that strips client-sent copies; required behind a tunnel, or every visitor shares one limit. |
 
-`/health` (JSON) always reports the relay's limits — the web UI reads them from there. Uptime, active-file counts, and Prometheus `/metrics` stay private unless you set `AIRPIPE_PUBLIC_STATS`.
+`/health` (JSON) always reports the relay's limits, which the web UI reads, and its protocol version, which the CLI checks before each transfer. Uptime, active-file counts, and Prometheus `/metrics` stay private unless you set `AIRPIPE_PUBLIC_STATS`.
 
 ## CLI
 
 ```bash
-curl -sSL https://airpipe.sanyamgarg.com/install.sh | sh   # or: go install github.com/Sanyam-G/Airpipe/cmd/airpipe@latest
+curl -sSL https://airpipe.sanyamgarg.com/install.sh | sh
+brew install sanyam-g/airpipe/airpipe
+go install github.com/Sanyam-G/Airpipe/v5/cmd/airpipe@latest
 ```
 
-Linux, macOS, Windows (amd64 + arm64). Self-update with `airpipe update`.
+Linux, macOS, Windows (amd64 + arm64). Self-update with `airpipe update`, or `brew upgrade airpipe` if you installed with Homebrew.
+
+v5 changed how a passphrase becomes a key, so v5 can't exchange files with v4 or older, and a v5 relay turns older clients away with a message to update. Update both ends.
 
 ```bash
 airpipe send report.pdf              # prompts: direct (P2P) or mailbox
@@ -64,7 +68,13 @@ Open [`/live`](https://airpipe.sanyamgarg.com/live) for a passphrase + QR, no in
 
 ## Encryption
 
-NaCl secretbox (XSalsa20 + Poly1305, 256-bit), layered on DTLS for the direct path. The passphrase derives both the relay token and the encryption key via domain-separated SHA-256, identical on CLI and browser. The key never leaves the device that made it; the relay only ever sees a room token and ciphertext.
+Files are encrypted with NaCl secretbox (XSalsa20-Poly1305, 256-bit key). The direct path also runs inside WebRTC's DTLS.
+
+A passphrase is four words from a 1024-word list plus a number from 10 to 99, about 10^14 possibilities. The CLI and the browser both run it through PBKDF2-HMAC-SHA256 with 600,000 iterations and a fixed salt, then split the result with HKDF into the encryption key and the room tokens. The browser uses WebCrypto for this. Each transfer derives them once, which takes well under a second on a laptop.
+
+The relay sees a room token, both IP addresses, sizes and timing, and the ciphertext of mailbox and relayed transfers. It never receives the key. Links and QR codes carry the key after the `#`, and browsers don't send that part to the server. The key in a link is the same one the passphrase produces.
+
+The token comes from the passphrase, so whoever runs the relay can still guess passphrases offline and check each guess against the token. Each guess costs a full PBKDF2 run. On one high-end GPU, trying every passphrase takes on the order of 200 years, about 100 on average. An attacker with many GPUs and a specific target can still get there. For files that need more than that, use a relay you run or trust. A PAKE handshake, which would stop offline guessing, is planned.
 
 ## Stack
 
