@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: docker/setup-qemu-action@v3
 
@@ -29,7 +31,9 @@ jobs:
         id: tags
         run: |
           tags="ghcr.io/sanyam-g/airpipe-relay:latest"
-          version="main-${GITHUB_SHA::7}"
+          # Tag name, or e.g. v4.4.0-3-gabc1234 on main. A main build of a
+          # tagged commit gets the tag too, so the two :latest pushes agree.
+          version="$(git describe --tags --always)"
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             version="${GITHUB_REF#refs/tags/}"
             tags="${tags},ghcr.io/sanyam-g/airpipe-relay:${version}"
