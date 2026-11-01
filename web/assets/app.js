@@ -66,7 +66,7 @@
     return rels.map(function (r) {
       const tag = r.tag_name || r.name || '';
       const date = fmtDate(r.published_at);
-      const summary = firstLine(r.body);
+      const summary = firstLine(r.body) || 'No notes';
       return ''
         + '<a class="cl-row" href="' + esc(r.html_url) + '" target="_blank" rel="noopener">'
         +   '<span class="cl-row-tag">' + esc(tag) + '</span>'
@@ -142,7 +142,7 @@
         return r.json();
       })
       .then(function (h) {
-        if (h && ver && /^v\d/.test(h.version || '')) ver.textContent = h.version;
+        if (h && ver && h.version) ver.textContent = h.version;
       })
       .catch(function () { setOffline(); });
   }

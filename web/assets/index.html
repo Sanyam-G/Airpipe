@@ -38,7 +38,7 @@
   <main class="home">
 
     <section class="hero">
-      <p class="eyebrow">ZERO-KNOWLEDGE FILE TRANSFER</p>
+      <p class="eyebrow">END-TO-END ENCRYPTED FILE TRANSFER</p>
       <h1 class="hero-h">Any two devices.<br><span class="accent">One passphrase.</span></h1>
 
       <div class="hero-grid">
@@ -51,14 +51,14 @@
           <div class="recv-mini">
             <span class="l-name">RECEIVE · GOT A PASSPHRASE?</span>
             <div class="recv-line">
-              <input id="pp-input" class="recv-input" type="text" placeholder="RIVER FALCON MARBLE 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
+              <input id="pp-input" class="recv-input" type="text" placeholder="MAPLE RIVER COMET PILOT 42" autocomplete="off" spellcheck="false" aria-label="passphrase">
               <button id="pp-go" class="recv-go">↵</button>
             </div>
             <div id="pp-err" class="recv-err"></div>
           </div>
           <div class="hero-meta">
             <span class="status" id="relay-status"><span class="dot"></span><span class="status-text">RELAY ONLINE</span></span>
-            <span><span class="meta-k">VERSION</span> <span id="relay-version">v4.2.0</span></span>
+            <span><span class="meta-k">VERSION</span> <span id="relay-version">-</span></span>
             <span><span class="meta-k">LICENSE</span> MIT</span>
             <span><span class="meta-k">SOURCE</span> <a href="https://github.com/Sanyam-G/Airpipe" target="_blank" rel="noopener">Sanyam-G/Airpipe</a></span>
           </div>
@@ -81,9 +81,9 @@
                    |_|   <span class="t-dim">send</span></span>
 <span class="tl" data-s="s2">  <span class="t-ink">demo.zip</span>  <span class="t-dim">4.2 MB</span></span>
 <span class="tl t-brand" data-s="s3">  ╔══════════════════════════════════════╗
-  ║      RIVER FALCON MARBLE 42          ║
+  ║      MAPLE RIVER COMET PILOT 42      ║
   ╚══════════════════════════════════════╝</span>
-<span class="tl" data-s="s4">  <span class="t-dim">Or run:</span> <span class="t-ink">airpipe download RIVER FALCON MARBLE 42</span></span>
+<span class="tl" data-s="s4">  <span class="t-dim">Or run:</span> <span class="t-ink">airpipe download MAPLE RIVER COMET PILOT 42</span></span>
 <span class="tl" data-s="s5">  <span class="t-dim">Waiting for receiver...</span></span>
 <span class="tl t-ok" data-s="s6">  ✓ Receiver joined</span>
 <span class="tl" data-s="s7">  [<span class="t-brand" id="bar-s">░░░░░░░░░░░░░░░░░░░░░░░░</span>] <span id="pct-s" class="t-dim">  0%</span></span>
@@ -93,7 +93,7 @@
                 <div class="wb-stage">
                   <div class="wb-head">SEND LIVE</div>
                   <div class="wl" data-s="s3">
-                    <div class="wb-phrase">RIVER FALCON MARBLE 42</div>
+                    <div class="wb-phrase">MAPLE RIVER COMET PILOT 42</div>
                     <div class="wb-qr" aria-hidden="true"></div>
                   </div>
                   <div class="wl wb-dim" data-s="s5">Waiting for receiver…</div>
@@ -125,7 +125,7 @@
   / _ \| | '_|  _/| | '_ \/ -_)
  /_/ \_\_|_| |_| |_| .__/\___|
                    |_|   <span class="t-dim">download</span></span>
-<span class="tl" data-s="r2">  <span class="t-dim">Passphrase:</span> <span class="t-brand">RIVER FALCON MARBLE 42</span>
+<span class="tl" data-s="r2">  <span class="t-dim">Passphrase:</span> <span class="t-brand">MAPLE RIVER COMET PILOT 42</span>
   <span class="t-dim">Destination:</span> <span class="t-ink">.</span></span>
 <span class="tl" data-s="r3">  <span class="t-dim">Looking up...</span></span>
 <span class="tl" data-s="r4">  <span class="t-dim">No mailbox transfer; opening direct connection...</span></span>
@@ -135,7 +135,7 @@
                 <div class="wb-url">airpipe.sanyamgarg.com<span class="wb-path">/d/…</span></div>
                 <div class="wb-stage">
                   <div class="wb-head">RECEIVE</div>
-                  <div class="wl" data-s="r2"><div class="wb-input">RIVER FALCON MARBLE 42</div></div>
+                  <div class="wl" data-s="r2"><div class="wb-input">MAPLE RIVER COMET PILOT 42</div></div>
                   <div class="wl wb-dim" data-s="r3">Looking up…</div>
                   <div class="wl wb-dim" data-s="r4">No mailbox transfer; opening direct connection…</div>
                   <div class="wl" data-s="r5">
@@ -157,7 +157,7 @@
         <span class="how-n">01</span>
         <div class="how-txt">
           <h3>Encrypt</h3>
-          <p>NaCl secretbox, in your browser or the CLI. The key is derived from the passphrase or carried in the URL fragment. It never reaches the server.</p>
+          <p>NaCl secretbox, in your browser or the CLI. The key is derived on each device from the passphrase, or carried in the URL fragment, which browsers never send to the server.</p>
         </div>
       </div>
       <div class="how-cell">
@@ -228,7 +228,7 @@
   <script>
   (function () {
     var CMD_S = 'airpipe send demo.zip';
-    var CMD_R = 'airpipe download RIVER FALCON MARBLE 42';
+    var CMD_R = 'airpipe download MAPLE RIVER COMET PILOT 42';
     var typeS = document.getElementById('type-s'), caretS = document.getElementById('caret-s');
     var typeR = document.getElementById('type-r'), caretR = document.getElementById('caret-r');
     var barS = document.getElementById('bar-s'), pctS = document.getElementById('pct-s');
