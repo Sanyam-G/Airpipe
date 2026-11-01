@@ -167,27 +167,13 @@ function generatePassphrase(){
   return words.join(' ')+' '+num;
 }
 
-async function sha256(str){
-  const data=new TextEncoder().encode(str);
-  const hash=await crypto.subtle.digest('SHA-256',data);
-  return new Uint8Array(hash);
-}
-
-function hexEncode(bytes){
-  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
 async function handleFiles(filesIn){
   const fileListArr=Array.from(filesIn||[]);
   if(!fileListArr.length)return;
   try{
     currentPhrase=generatePassphrase();
-    const normalized=currentPhrase.toUpperCase().trim().replace(/\s+/g,' ');
-    const tokenHash=await sha256('airpipe:token:'+normalized);
-    const derivedToken=hexEncode(tokenHash.slice(0,8));
-    const keyBytes=await sha256('airpipe:key:'+normalized);
-
     show('encrypting');
+    const {token:derivedToken,key:keyBytes}=await deriveSecrets(currentPhrase);
     document.getElementById('enc-progress').style.width='10%';
     document.getElementById('enc-text').textContent=fileListArr.length>1?'reading files…':'reading file…';
 
@@ -294,17 +280,15 @@ async function receiveSubmit(){
   const p=ppInput.value.toUpperCase().trim().replace(/\s+/g,' ');
   if(!p||p.length<5){ppErr.textContent='enter the passphrase';return}
   if(!crypto||!crypto.subtle){ppErr.textContent='browser missing crypto.subtle (needs HTTPS or localhost)';return}
-  const t=await sha256('airpipe:token:'+p);
-  const k=await sha256('airpipe:key:'+p);
-  const rt=await sha256('airpipe:receive-token:'+p);
+  const s=await deriveSecrets(p);
   try{
-    const room=await fetch('/room/'+hexEncode(rt.slice(0,8)));
+    const room=await fetch('/room/'+s.receiveToken);
     if(room.ok&&(await room.json()).waiting){
-      location.href='/u/'+hexEncode(rt.slice(0,8))+'#'+b64encode(k);
+      location.href='/u/'+s.receiveToken+'#'+b64encode(s.key);
       return;
     }
   }catch(e){}
-  location.href='/d/'+hexEncode(t.slice(0,8))+'#'+b64encode(k);
+  location.href='/d/'+s.token+'#'+b64encode(s.key);
 }
 document.getElementById('pp-go').addEventListener('click',receiveSubmit);
 ppInput.addEventListener('keydown',e=>{if(e.key==='Enter')receiveSubmit()});

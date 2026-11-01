@@ -8,7 +8,33 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 )
+
+// checkRelay stops early when the relay speaks another protocol version.
+// Mismatched versions derive different rooms, so the transfer would otherwise just wait.
+func checkRelay(relay string) error {
+	resp, err := http.Get(toHTTP(relay) + "/health")
+	if err != nil {
+		return fmt.Errorf("relay unreachable: %w", err)
+	}
+	defer resp.Body.Close()
+	var h struct {
+		Version         string `json:"version"`
+		ProtocolVersion int    `json:"protocol_version"`
+	}
+	if resp.StatusCode != http.StatusOK || json.NewDecoder(resp.Body).Decode(&h) != nil {
+		return fmt.Errorf("relay at %s did not answer /health (HTTP %d)", relay, resp.StatusCode)
+	}
+	switch want := int(transfer.ProtocolVersion); {
+	case h.ProtocolVersion < want:
+		return fmt.Errorf("relay at %s runs an older AirPipe (%s, protocol %d); this CLI needs a v5 relay", relay, h.Version, h.ProtocolVersion)
+	case h.ProtocolVersion > want:
+		return fmt.Errorf("relay at %s runs a newer AirPipe (%s). Update with: airpipe update (or brew upgrade airpipe)", relay, h.Version)
+	}
+	return nil
+}
 
 func uploadEncrypted(baseURL string, ciphertext []byte, clientToken string) (string, error) {
 	pr, pw := io.Pipe()

@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/sanyamgarg/airpipe/internal/relay"
+	"github.com/Sanyam-G/Airpipe/v5/internal/relay"
 )
 
 // buildVersion is set via -ldflags at build time.

@@ -181,10 +181,18 @@
   if (!input || !go) return;
 
   function norm(p) { return p.toUpperCase().trim().replace(/\s+/g, ' '); }
-  async function sha256(s) {
-    const data = new TextEncoder().encode(s);
-    const h = await crypto.subtle.digest('SHA-256', data);
-    return new Uint8Array(h);
+  // Copy of deriveSecrets in internal/relay/static/airpipe-protocol.js; keep in sync.
+  async function deriveSecrets(phrase) {
+    const s = crypto.subtle, te = new TextEncoder();
+    const pw = await s.importKey('raw', te.encode(norm(phrase)), 'PBKDF2', false, ['deriveBits']);
+    const master = await s.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: te.encode('airpipe/v5/kdf'), iterations: 600000 }, pw, 256);
+    const mk = await s.importKey('raw', master, 'HKDF', false, ['deriveBits']);
+    const expand = async (label, n) => new Uint8Array(await s.deriveBits({ name: 'HKDF', hash: 'SHA-256', salt: new Uint8Array(), info: te.encode(label) }, mk, n * 8));
+    return {
+      key: await expand('airpipe/v5/key', 32),
+      token: hex(await expand('airpipe/v5/token', 16)),
+      receiveToken: hex(await expand('airpipe/v5/receive-token', 16)),
+    };
   }
   function hex(b) { return Array.from(b).map(x => x.toString(16).padStart(2, '0')).join(''); }
   function b64url(b) {
@@ -199,17 +207,15 @@
       err.textContent = 'browser missing crypto.subtle (needs HTTPS or localhost)';
       return;
     }
-    const t = await sha256('airpipe:token:' + p);
-    const k = await sha256('airpipe:key:' + p);
-    const rt = await sha256('airpipe:receive-token:' + p);
+    const s = await deriveSecrets(p);
     try {
-      const room = await fetch('/room/' + hex(rt.slice(0, 8)));
+      const room = await fetch('/room/' + s.receiveToken);
       if (room.ok && (await room.json()).waiting) {
-        location.href = '/u/' + hex(rt.slice(0, 8)) + '#' + b64url(k);
+        location.href = '/u/' + s.receiveToken + '#' + b64url(s.key);
         return;
       }
     } catch (e) {}
-    location.href = '/d/' + hex(t.slice(0, 8)) + '#' + b64url(k);
+    location.href = '/d/' + s.token + '#' + b64url(s.key);
   }
   go.addEventListener('click', submit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });

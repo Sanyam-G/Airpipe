@@ -151,7 +151,7 @@ func (fs *FileStore) Shutdown() {
 }
 
 func genToken() string {
-	b := make([]byte, 8)
+	b := make([]byte, 16)
 	rand.Read(b)
 	return hex.EncodeToString(b)
 }

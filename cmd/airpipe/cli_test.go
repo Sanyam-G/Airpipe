@@ -1,6 +1,13 @@
 package main
 
-import "testing"
+import (
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
+)
 
 func TestArchiveName(t *testing.T) {
 	cases := []struct {
@@ -55,5 +62,21 @@ func TestRelayURLConversion(t *testing.T) {
 	}
 	if got := toHTTP("wss://airpipe.example.com"); got != "https://airpipe.example.com" {
 		t.Fatal(got)
+	}
+}
+
+func TestCheckRelay(t *testing.T) {
+	for _, c := range []struct {
+		proto int
+		ok    bool
+	}{{int(transfer.ProtocolVersion), true}, {3, false}, {int(transfer.ProtocolVersion) + 1, false}} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprintf(w, `{"version":"vX","protocol_version":%d}`, c.proto)
+		}))
+		err := checkRelay(srv.URL)
+		srv.Close()
+		if (err == nil) != c.ok {
+			t.Errorf("protocol %d: err = %v, want ok=%v", c.proto, err, c.ok)
+		}
 	}
 }

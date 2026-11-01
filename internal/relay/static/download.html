@@ -106,6 +106,8 @@ const NEGOTIATE_TIMEOUT_MS = 15000;
 const token = location.pathname.split('/').pop();
 const keyStr = location.hash.slice(1);
 if (!token || !keyStr) { showError('Invalid link'); throw '' }
+// 16-hex tokens come from AirPipe before v5, which derives a different key.
+if (/^[0-9a-f]{16}$/.test(token)) { showError('This link was made with an older AirPipe. Ask the sender to update (airpipe update) and send it again.'); throw '' }
 
 let key;
 try {

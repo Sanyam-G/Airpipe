@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sanyamgarg/airpipe/internal/crypto"
-	"github.com/sanyamgarg/airpipe/internal/mailbox"
-	"github.com/sanyamgarg/airpipe/internal/passphrase"
-	"github.com/sanyamgarg/airpipe/internal/transfer"
+	"github.com/Sanyam-G/Airpipe/v5/internal/crypto"
+	"github.com/Sanyam-G/Airpipe/v5/internal/mailbox"
+	"github.com/Sanyam-G/Airpipe/v5/internal/passphrase"
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 )
 
 func cmdDownload(relay string, args []string) error {
@@ -28,9 +28,13 @@ func cmdDownload(relay string, args []string) error {
 		}
 	}
 
+	if err := checkRelay(relay); err != nil {
+		return err
+	}
 	phrase := strings.Join(phraseArgs, " ")
-	derivedToken := passphrase.DeriveToken(phrase)
-	derivedKey := passphrase.DeriveKey(phrase)
+	secrets := passphrase.Derive(phrase)
+	derivedToken := secrets.Token
+	derivedKey := secrets.Key
 
 	banner("download")
 	fmt.Printf("  Passphrase: %s%s%s\n", colorBrand, passphrase.Normalize(phrase), colorReset)

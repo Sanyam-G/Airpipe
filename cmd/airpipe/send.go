@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sanyamgarg/airpipe/internal/archive"
-	"github.com/sanyamgarg/airpipe/internal/crypto"
-	"github.com/sanyamgarg/airpipe/internal/mailbox"
-	"github.com/sanyamgarg/airpipe/internal/passphrase"
-	"github.com/sanyamgarg/airpipe/internal/transfer"
+	"github.com/Sanyam-G/Airpipe/v5/internal/archive"
+	"github.com/Sanyam-G/Airpipe/v5/internal/crypto"
+	"github.com/Sanyam-G/Airpipe/v5/internal/mailbox"
+	"github.com/Sanyam-G/Airpipe/v5/internal/passphrase"
+	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 )
 
 func cmdSend(relay string, args []string) error {
@@ -37,6 +37,9 @@ func cmdSend(relay string, args []string) error {
 		if info.IsDir() {
 			anyDir = true
 		}
+	}
+	if err := checkRelay(relay); err != nil {
+		return err
 	}
 	resolvedMode, err := resolveMode(*mode)
 	if err != nil {
@@ -89,9 +92,9 @@ func cmdSend(relay string, args []string) error {
 	}
 
 	phrase := passphrase.Generate()
-	derivedToken := passphrase.DeriveToken(phrase)
-	derivedKeyArr := passphrase.DeriveKey(phrase)
-	derivedKey := derivedKeyArr[:]
+	secrets := passphrase.Derive(phrase)
+	derivedToken := secrets.Token
+	derivedKey := secrets.Key[:]
 
 	if *stayOpen && resolvedMode != "p2p" {
 		return fmt.Errorf("--stay-open is only supported in p2p mode (--mode p2p)")

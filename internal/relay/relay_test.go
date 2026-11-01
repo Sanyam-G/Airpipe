@@ -277,8 +277,8 @@ func TestFileStoreRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
-	if len(token) != 16 {
-		t.Fatalf("expected 16 char token, got %d: %s", len(token), token)
+	if len(token) != 32 {
+		t.Fatalf("expected 32 char token, got %d: %s", len(token), token)
 	}
 
 	sf, ok := fs.Get(token)
@@ -486,7 +486,7 @@ func TestConfigBadEnvFallsBack(t *testing.T) {
 
 func TestRoomStatusEndpoint(t *testing.T) {
 	s := newTestServer(t)
-	token := "00112233aabbccdd"
+	token := "00112233aabbccdd00112233aabbccdd"
 
 	check := func(path string, wantStatus int, wantWaiting bool) {
 		t.Helper()
@@ -523,4 +523,36 @@ func TestRoomStatusEndpoint(t *testing.T) {
 	check("/room/not-a-token", http.StatusBadRequest, false)
 
 	s.roomManager.DeleteRoom(token)
+}
+
+func TestLegacyClientsGetUpdateMessage(t *testing.T) {
+	s := newTestServer(t)
+	srv := httptest.NewServer(s.Routes())
+	defer srv.Close()
+	legacy := "00112233aabbccdd"
+
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	mw.WriteField("token", legacy)
+	part, _ := mw.CreateFormFile("file", "encrypted.bin")
+	part.Write([]byte("x"))
+	mw.Close()
+	resp, err := http.Post(srv.URL+"/upload", mw.FormDataContentType(), body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msg, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusUpgradeRequired || !strings.Contains(string(msg), "airpipe update") {
+		t.Fatalf("legacy upload: %d %q", resp.StatusCode, msg)
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+srv.URL[4:]+"/ws/"+legacy, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if _, _, err := conn.ReadMessage(); err == nil || !strings.Contains(err.Error(), "airpipe update") {
+		t.Fatalf("legacy ws: %v", err)
+	}
 }

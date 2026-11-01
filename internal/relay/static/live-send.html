@@ -123,17 +123,9 @@ function randomHex(nBytes){
   const b=nacl.randomBytes(nBytes);
   return Array.from(b).map(x=>x.toString(16).padStart(2,'0')).join('');
 }
-function hexEncode(bytes){
-  return Array.from(bytes).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
 function b64encode(bytes){
   let bin='';for(let i=0;i<bytes.length;i++)bin+=String.fromCharCode(bytes[i]);
   return btoa(bin).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-async function sha256(str){
-  const data=new TextEncoder().encode(str);
-  const hash=await crypto.subtle.digest('SHA-256',data);
-  return new Uint8Array(hash);
 }
 function generatePassphrase(){
   const words=[];
@@ -182,10 +174,7 @@ function copyPhrase(){
 
 async function init(){
   currentPhrase=generatePassphrase();
-  const normalized=currentPhrase.toUpperCase().trim().replace(/\s+/g,' ');
-  const tokenHash=await sha256('airpipe:token:'+normalized);
-  token=hexEncode(tokenHash.slice(0,8));
-  keyBytes=await sha256('airpipe:key:'+normalized);
+  ({token,key:keyBytes}=await deriveSecrets(currentPhrase));
   // Send receivers to /d/{token} so the same passphrase resolver works whether
   // they type it on the homepage or scan the QR. /d/ probes the mailbox first
   // and falls back to live WS pairing on 404.

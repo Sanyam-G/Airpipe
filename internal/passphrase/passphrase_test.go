@@ -44,70 +44,36 @@ func TestNormalize(t *testing.T) {
 	}
 }
 
-func TestDeriveTokenDeterministic(t *testing.T) {
-	a := DeriveToken("RIVER FALCON MARBLE 42")
-	b := DeriveToken("RIVER FALCON MARBLE 42")
-	if a != b {
-		t.Fatalf("DeriveToken not deterministic: %q != %q", a, b)
-	}
-	if len(a) != 16 {
-		t.Fatalf("DeriveToken length = %d, want 16", len(a))
-	}
-	// Verify it's valid hex
-	if _, err := hex.DecodeString(a); err != nil {
-		t.Fatalf("DeriveToken not valid hex: %v", err)
+// Known-answer vectors. The browser implementation (deriveSecrets in
+// internal/relay/static/airpipe-protocol.js and the copy in web/assets/app.js)
+// must produce the same values; /static/_kdf-check.html checks it in a browser.
+var deriveVectors = []struct {
+	phrase, token, receiveToken, key string
+}{
+	{"RIVER FALCON MARBLE 42", "95662f2cc42823ab1ff21ca9e81b886d", "f46edda0efefcd42cf1887ec5ab36df5", "43273724277857759978acee2bb0f0eb14773b45175f4783cadaa66588633791"},
+	{"OCEAN TIGER STORM 77", "c7bbb4eb021f118a9603cbdaaa38995d", "a38edfee5691dae8d263d878dcf0c28a", "fda61134b1a26b913fee5625dc3300e6c1600f7f8133dd9d222141b34c81db67"},
+}
+
+func TestDeriveVectors(t *testing.T) {
+	for _, v := range deriveVectors {
+		s := Derive(v.phrase)
+		if s.Token != v.token || s.ReceiveToken != v.receiveToken || hex.EncodeToString(s.Key[:]) != v.key {
+			t.Errorf("Derive(%q) = %s %s %x, want %s %s %s", v.phrase, s.Token, s.ReceiveToken, s.Key, v.token, v.receiveToken, v.key)
+		}
 	}
 }
 
-func TestDeriveKeyDeterministic(t *testing.T) {
-	a := DeriveKey("RIVER FALCON MARBLE 42")
-	b := DeriveKey("RIVER FALCON MARBLE 42")
-	if a != b {
-		t.Fatalf("DeriveKey not deterministic")
+func TestDeriveNormalizes(t *testing.T) {
+	if Derive("  river  falcon\tmarble 42 ") != Derive("RIVER FALCON MARBLE 42") {
+		t.Fatal("Derive should normalize the passphrase")
 	}
 }
 
-func TestDeriveTokenNormalizes(t *testing.T) {
-	a := DeriveToken("RIVER FALCON MARBLE 42")
-	b := DeriveToken("river  falcon  marble  42")
-	if a != b {
-		t.Fatalf("DeriveToken should normalize: %q != %q", a, b)
-	}
-}
-
-func TestDeriveKeyNormalizes(t *testing.T) {
-	a := DeriveKey("RIVER FALCON MARBLE 42")
-	b := DeriveKey("river  falcon  marble  42")
-	if a != b {
-		t.Fatalf("DeriveKey should normalize")
-	}
-}
-
-func TestTokenAndKeyAreIndependent(t *testing.T) {
-	token := DeriveToken("RIVER FALCON MARBLE 42")
-	key := DeriveKey("RIVER FALCON MARBLE 42")
-	keyHex := hex.EncodeToString(key[:8])
-	if token == keyHex {
-		t.Fatal("Token and key first 8 bytes should differ (different domain prefixes)")
-	}
-}
-
-// Hardcoded test vector for cross-language verification.
-// If this test breaks, the JS derivation in words.js/index.html must also be updated.
-func TestDeriveTestVector(t *testing.T) {
-	token := DeriveToken("RIVER FALCON MARBLE 42")
-	key := DeriveKey("RIVER FALCON MARBLE 42")
-
-	// Log the values so we can hardcode the JS test
-	t.Logf("Test vector - Token: %s", token)
-	t.Logf("Test vector - Key hex: %s", hex.EncodeToString(key[:]))
-}
-
-func TestDifferentPhrasesProduceDifferentTokens(t *testing.T) {
-	a := DeriveToken("RIVER FALCON MARBLE 42")
-	b := DeriveToken("OCEAN TIGER STORM 77")
-	if a == b {
-		t.Fatal("Different passphrases should produce different tokens")
+func TestDeriveOutputsDistinct(t *testing.T) {
+	s := Derive("RIVER FALCON MARBLE 42")
+	key := hex.EncodeToString(s.Key[:])
+	if s.Token == s.ReceiveToken || key[:32] == s.Token || key[:32] == s.ReceiveToken {
+		t.Fatal("token, receive token and key must come from distinct labels")
 	}
 }
 
@@ -121,20 +87,5 @@ func TestWordlistSize(t *testing.T) {
 			t.Fatalf("Duplicate word in wordlist: %s", w)
 		}
 		seen[w] = true
-	}
-}
-
-func TestDeriveReceiveTokenDistinct(t *testing.T) {
-	phrase := "RIVER FALCON MARBLE 42"
-	dl := DeriveToken(phrase)
-	recv := DeriveReceiveToken(phrase)
-	if dl == recv {
-		t.Fatal("receive token must not collide with download token")
-	}
-	if len(recv) != 16 {
-		t.Fatalf("token length %d, want 16", len(recv))
-	}
-	if recv != DeriveReceiveToken("river falcon  marble 42") {
-		t.Fatal("normalization must apply to receive tokens")
 	}
 }
