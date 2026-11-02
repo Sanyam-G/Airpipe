@@ -1,4 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="12" fill="#1B1714"/>
-  <text x="32" y="46" font-family="'JetBrains Mono', ui-monospace, monospace" font-size="40" font-weight="700" text-anchor="middle" fill="#FF4F00">A</text>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#FF4F00"/><path fill="#14100D" d="M14 30a14 14.6 0 1 1 28 0a14 14.6 0 1 1 -28 0ZM22 30a6 7.2 0 1 0 12 0a6 7.2 0 1 0 -12 0ZM34 16H42V32A4 4 0 0 0 46 36H54V44H46A12 12 0 0 1 34 32Z"/></svg>

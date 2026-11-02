@@ -1,4 +1,4 @@
-# AirPipe
+<h1><picture><source media="(prefers-color-scheme: dark)" srcset="web/assets/airpipe-logo-dark.svg"><img src="web/assets/airpipe-logo-light.svg" alt="AirPipe" height="48"></picture></h1>
 
 Send a file to any device by sharing a passphrase. It streams straight from one machine to the other, encrypted end to end. The relay that connects the two ends only handles encrypted data.
 

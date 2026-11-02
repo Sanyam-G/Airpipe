@@ -72,16 +72,7 @@ code {
 }
 .nav-brand:hover { color: var(--ink); }
 
-.brand-mark {
-  width: 26px;
-  height: 26px;
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: var(--bg);
-  font: 800 15px/1 var(--mono);
-  border-radius: 4px;
-}
+.brand-mark { width: 26px; height: 26px; display: block; border-radius: 6px; }
 
 .nav-right { display: flex; align-items: center; gap: 22px; }
 
