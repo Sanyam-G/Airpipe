@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Generate returns a passphrase like "RIVER FALCON MARBLE 42".
+// Generate returns a passphrase like "DUSK PINE ECHO GUST 42".
 // 4 random words from the 1024-word list + a 2-digit number (10-99).
 func Generate() string {
 	words := make([]string, 4)

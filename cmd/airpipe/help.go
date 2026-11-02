@@ -20,7 +20,7 @@ func printHelp() {
 
 	fmt.Printf("%sCommands%s\n", b, r)
 	fmt.Printf("  %ssend%s [--stay-open] [--mode p2p|mailbox] <file> [file2...]\n", b, r)
-	fmt.Printf("      Encrypt and share a file. You get a passphrase like %sRIVER FALCON MARBLE 42%s.\n", b, r)
+	fmt.Printf("      Encrypt and share a file. You get a passphrase like %sDUSK PINE ECHO GUST 42%s.\n", b, r)
 	fmt.Printf("      In %sp2p%s mode, multiple files stream in one session; a %sfolder%s is zipped.\n", b, r, b, r)
 	fmt.Printf("      In %smailbox%s mode, multiple files ship in one upload without zipping;\n", b, r)
 	fmt.Printf("        %sfolders%s (or mixes with folders) still become one zip upload.\n", b, r)
@@ -57,7 +57,7 @@ func printHelp() {
 	fmt.Printf("  airpipe send report.pdf\n")
 	fmt.Printf("  airpipe send report.pdf notes.txt    %s# p2p: two files, one connection%s\n", d, r)
 	fmt.Printf("  airpipe send photos/ docs/          %s# mailed or p2p with dirs: zip%s\n", d, r)
-	fmt.Printf("  airpipe download RIVER FALCON MARBLE 42\n")
+	fmt.Printf("  airpipe download DUSK PINE ECHO GUST 42\n")
 	fmt.Printf("  airpipe receive ~/Downloads\n")
 	fmt.Printf("  airpipe --relay https://my.relay send a.zip\n\n")
 
