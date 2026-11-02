@@ -2,13 +2,11 @@
 
 Send a file to any device by sharing a passphrase. It streams straight from one machine to the other, encrypted end to end. The relay that connects the two ends only handles encrypted data.
 
-![AirPipe: a file streams peer-to-peer from a sender terminal to a receiver terminal via an encrypted passphrase](demo.svg)
+![AirPipe: the sender and receiver swap an encrypted offer and answer through the relay, then the file streams directly over WebRTC, encrypted end to end; the relay never gets the key](web/assets/airpipe-flow.svg)
 
 **Try it:** [airpipe.sanyamgarg.com](https://airpipe.sanyamgarg.com)
 
 ## How it works
-
-![How AirPipe connects: both ends reach the relay only for encrypted signaling, then the file streams directly over WebRTC, encrypted end to end; the key never reaches the relay](web/assets/p2p.svg)
 
 The sender picks a file and gets a passphrase like `RIVER FALCON MARBLE 42`. The receiver enters it on the website, in the terminal (`airpipe download RIVER FALCON MARBLE 42`), or by scanning the QR. The file then transfers directly between the two devices, encrypted the whole way.
 
