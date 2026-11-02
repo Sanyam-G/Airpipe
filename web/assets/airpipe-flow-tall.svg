@@ -1,140 +1,72 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 430 820" width="430" height="820" font-family="'JetBrains Mono','SFMono-Regular',ui-monospace,monospace" role="img" aria-label="AirPipe: the sender runs airpipe send and gets a passphrase; the receiver types it. Both reach the relay only to swap an encrypted WebRTC offer and answer, then the file streams directly between them, encrypted end to end. The relay never gets the key, and if a direct path fails it forwards ciphertext only.">
-  <style>
-    text { font-size: 13px; }
-    .dim { fill: #8D8477; }
-    .ink { fill: #ECE6DC; }
-    .acc { fill: #FF4F00; }
-    .ok  { fill: #6FBF73; }
-    .lbl { font-size: 10px; letter-spacing: 1.5px; font-weight: 700; }
-    .sm  { font-size: 11px; }
-    .fillbox { transform-box: fill-box; transform-origin: left center; }
-    .ctr { transform-box: fill-box; transform-origin: center; }
-
-    /* one shared 14s clock: typing, handshake and transfer stay in step.
-       Packets loop at 1s (14 per cycle) so they stay in phase too. */
-    .a11,.a14,.a18,.a22,.a26,.a38,.a40,.a43,.a46,.a48,.a61,.a64,.a87,.a89,
-    .prog,.sigS,.sigR,.relay,.d1,.d2,.dline,.pipe,.lock { animation-duration: 14s; animation-timing-function: linear; animation-iteration-count: infinite; }
-
-    /* steps() = one monospace char per tick */
-    .type-s { animation: typeS 14s steps(24,end) infinite; }
-    .type-r { animation: typeR 14s steps(42,end) infinite; }
-    .caret  { animation: blink 1.06s steps(1,end) infinite; }
-    .pkt    { animation: flow 1s linear infinite; }
-
-    @keyframes blink { 0%,49% { opacity: 1 } 50%,100% { opacity: 0 } }
-    @keyframes typeS { 0%,2% { transform: scaleX(0) } 9%,100% { transform: scaleX(1) } }
-    @keyframes typeR { 0%,29% { transform: scaleX(0) } 37%,100% { transform: scaleX(1) } }
-
-    /* sender reaches the relay while it waits; receiver when it opens direct */
-    .sigS { animation-name: sigS } @keyframes sigS { 0%,25.9% {opacity:0} 27%,61% {opacity:1} 65%,96% {opacity:.14} 100% {opacity:0} }
-    .sigR { animation-name: sigR } @keyframes sigR { 0%,45.9% {opacity:0} 47%,61% {opacity:1} 65%,96% {opacity:.14} 100% {opacity:0} }
-    .relay { animation-name: relay } @keyframes relay { 0%,25.9% {stroke:rgba(236,230,220,.12)} 27%,61% {stroke:#FF4F00} 65%,100% {stroke:rgba(236,230,220,.12)} }
-    /* offer: sender -> relay -> receiver; answer: back. Both encrypted. */
-    .d1 { animation-name: d1 } @keyframes d1 { 0%,48.9% {opacity:0; transform:translate(0,0)} 49% {opacity:1; transform:translate(0,0)} 51% {transform:translate(0,42px)} 53% {transform:translate(0,138px)} 54.5% {transform:translate(0,180px)} 54.5% {opacity:1} 54.6%,100% {opacity:0} }
-    .d2 { animation-name: d2 } @keyframes d2 { 0%,54.9% {opacity:0; transform:translate(0,0)} 55% {opacity:1; transform:translate(0,0)} 56.5% {transform:translate(0,-42px)} 58.5% {transform:translate(0,-138px)} 60.5% {transform:translate(0,-180px)} 60.5% {opacity:1} 60.6%,100% {opacity:0} }
-    /* then the direct WebRTC path opens and carries the file */
-    .dline { animation-name: dline } @keyframes dline { 0%,61% {stroke-dashoffset:176; opacity:1} 64%,96% {stroke-dashoffset:0; opacity:1} 100% {stroke-dashoffset:0; opacity:0} }
-    .lock  { animation-name: lock } @keyframes lock { 0%,62% {opacity:0; transform:scale(.4)} 64% {opacity:1; transform:scale(1.15)} 65.5%,96% {opacity:1; transform:scale(1)} 100% {opacity:0; transform:scale(1)} }
-    .pipe  { animation-name: pipe } @keyframes pipe { 0%,63.9% {opacity:0} 64%,86% {opacity:1} 86.1%,100% {opacity:0} }
-    .prog  { animation-name: prog } @keyframes prog { 0%,64% { transform: scaleX(0) } 86%,96% { transform: scaleX(1) } 100% { transform: scaleX(0) } }
-    @keyframes flow { 0% {opacity:0; transform:translateY(0)} 12%,88% {opacity:1} 100% {opacity:0; transform:translateY(164px)} }
-
-    .a11 { animation-name: a11 } @keyframes a11 { 0%,10.9% {opacity:0} 11%,96% {opacity:1} 100% {opacity:0} }
-    .a14 { animation-name: a14 } @keyframes a14 { 0%,13.9% {opacity:0} 14%,96% {opacity:1} 100% {opacity:0} }
-    .a18 { animation-name: a18 } @keyframes a18 { 0%,17.9% {opacity:0} 18%,96% {opacity:1} 100% {opacity:0} }
-    .a22 { animation-name: a22 } @keyframes a22 { 0%,21.9% {opacity:0} 22%,96% {opacity:1} 100% {opacity:0} }
-    .a26 { animation-name: a26 } @keyframes a26 { 0%,25.9% {opacity:0} 26%,96% {opacity:1} 100% {opacity:0} }
-    .a38 { animation-name: a38 } @keyframes a38 { 0%,37.9% {opacity:0} 38%,96% {opacity:1} 100% {opacity:0} }
-    .a40 { animation-name: a40 } @keyframes a40 { 0%,39.9% {opacity:0} 40%,96% {opacity:1} 100% {opacity:0} }
-    .a43 { animation-name: a43 } @keyframes a43 { 0%,42.9% {opacity:0} 43%,96% {opacity:1} 100% {opacity:0} }
-    .a46 { animation-name: a46 } @keyframes a46 { 0%,45.9% {opacity:0} 46%,96% {opacity:1} 100% {opacity:0} }
-    .a48 { animation-name: a48 } @keyframes a48 { 0%,47.9% {opacity:0} 48%,96% {opacity:1} 100% {opacity:0} }
-    .a61 { animation-name: a61 } @keyframes a61 { 0%,60.9% {opacity:0} 61%,96% {opacity:1} 100% {opacity:0} }
-    .a64 { animation-name: a64 } @keyframes a64 { 0%,63.9% {opacity:0} 64%,96% {opacity:1} 100% {opacity:0} }
-    .a87 { animation-name: a87 } @keyframes a87 { 0%,86.9% {opacity:0} 87%,96% {opacity:1} 100% {opacity:0} }
-    .a89 { animation-name: a89 } @keyframes a89 { 0%,88.9% {opacity:0} 89%,96% {opacity:1} 100% {opacity:0} }
-  </style>
-
-  <rect width="430" height="820" rx="14" fill="#14100D"/>
-
-  <!-- ===== SENDER ===== -->
-  <g transform="translate(0 0)">
-    <rect x="20" y="20" width="390" height="300" rx="12" fill="#100D0A" stroke="rgba(236,230,220,0.12)"/>
-    <circle cx="44" cy="44" r="5" fill="#FF4F00"/><circle cx="60" cy="44" r="5" fill="#221C17"/><circle cx="76" cy="44" r="5" fill="#221C17"/>
-    <text x="94" y="48" class="dim">airpipe</text>
-    <text x="392" y="48" text-anchor="end" class="acc lbl">SENDER</text>
-    <line x1="20" y1="60" x2="410" y2="60" stroke="rgba(236,230,220,0.07)"/>
-    <clipPath id="clipS"><rect class="fillbox type-s" x="38" y="72" width="196" height="20"/></clipPath>
-    <g clip-path="url(#clipS)">
-      <text x="40" y="86"><tspan class="dim">$ </tspan><tspan class="ink">airpipe send demo.zip</tspan><tspan class="caret ink" font-weight="700">&#9608;</tspan></text>
-    </g>
-    <text x="40" y="112" class="acc a11" font-weight="700">AirPipe &#183; send</text>
-    <text x="40" y="134" class="a14"><tspan class="ink">demo.zip</tspan><tspan class="dim">   4.2 MB</tspan></text>
-    <g class="a18">
-      <rect x="40" y="146" width="300" height="28" rx="6" fill="rgba(255,79,0,0.08)" stroke="#FF4F00"/>
-      <text x="54" y="165" class="acc" font-weight="700" letter-spacing="1">RIVER FALCON MARBLE 42</text>
-    </g>
-    <text x="40" y="196" class="dim a22">Or: airpipe download RIVER FALCON MARBLE 42</text>
-    <text x="40" y="218" class="dim a26">Waiting for receiver to join&#8230;</text>
-    <text x="40" y="240" class="ok a48">&#10003; Receiver joined</text>
-    <g class="a61">
-      <rect x="40" y="252" width="320" height="9" rx="4.5" fill="#221C17"/>
-      <rect class="fillbox prog" x="40" y="252" width="320" height="9" rx="4.5" fill="#FF4F00"/>
-    </g>
-    <text x="40" y="292" class="a87"><tspan class="ok">&#10003; Sent </tspan><tspan class="ink">demo.zip</tspan><tspan class="dim">  (4.2 MB)</tspan></text>
-  </g>
-
-  <!-- signaling through the relay -->
-  <line class="sigS" x1="330" y1="320" x2="330" y2="410" stroke="#ECE6DC" stroke-opacity=".45" stroke-width="1.2" stroke-dasharray="3 5" fill="none"/>
-  <line class="sigR" x1="330" y1="410" x2="330" y2="500" stroke="#ECE6DC" stroke-opacity=".45" stroke-width="1.2" stroke-dasharray="3 5" fill="none"/>
-  <text class="sigS dim sm" x="318" y="346" text-anchor="end">offer/answer</text>
-  <text class="sigR dim sm" x="318" y="482" text-anchor="end">encrypted</text>
-  <circle class="d1" cx="330" cy="320" r="4" fill="#FF4F00"/>
-  <circle class="d2" cx="330" cy="500" r="4" fill="#FF4F00"/>
-  <rect class="relay" x="250" y="362" width="160" height="96" rx="8" fill="#100D0A" stroke="rgba(236,230,220,.12)" stroke-width="1.2"/>
-  <text x="330" y="386" text-anchor="middle" class="acc lbl">RELAY</text>
-  <text x="330" y="406" text-anchor="middle" class="dim sm">never gets key</text>
-  <text x="330" y="428" text-anchor="middle" class="dim sm" opacity=".6">fallback:</text>
-  <text x="330" y="442" text-anchor="middle" class="dim sm" opacity=".6">ciphertext only</text>
-
-  <!-- ===== direct path ===== -->
-  <line x1="80" y1="322" x2="80" y2="498" stroke="#221C17" stroke-width="3"/>
-  <line class="dline" x1="80" y1="322" x2="80" y2="498" stroke="#FF4F00" stroke-width="3" stroke-dasharray="176"/>
-  <g class="pipe">
-    <circle class="pkt" cx="80" cy="326" r="4" fill="#ECE6DC"/>
-    <circle class="pkt" cx="80" cy="326" r="4" fill="#ECE6DC" style="animation-delay:-.33s"/>
-    <circle class="pkt" cx="80" cy="326" r="4" fill="#ECE6DC" style="animation-delay:-.66s"/>
-  </g>
-  <g class="a64">
-    <text x="104" y="406" class="ink lbl">WebRTC</text>
-    <text x="104" y="422" class="dim sm">E2E &#183; NaCl</text>
-  </g>
-  <g class="lock ctr">
-    <circle cx="80" cy="410" r="13" fill="#14100D" stroke="#FF4F00" stroke-width="1.5"/>
-    <path d="M75.5 408v-3a4.5 4.5 0 0 1 9 0v3" fill="none" stroke="#FF4F00" stroke-width="1.6"/>
-    <rect x="73" y="408" width="14" height="9" rx="1.5" fill="#FF4F00"/>
-  </g>
-
-  <!-- ===== RECEIVER ===== -->
-  <g transform="translate(-490 480)">
-    <rect x="510" y="20" width="390" height="300" rx="12" fill="#100D0A" stroke="rgba(236,230,220,0.12)"/>
-    <circle cx="534" cy="44" r="5" fill="#FF4F00"/><circle cx="550" cy="44" r="5" fill="#221C17"/><circle cx="566" cy="44" r="5" fill="#221C17"/>
-    <text x="584" y="48" class="dim">airpipe</text>
-    <text x="882" y="48" text-anchor="end" class="acc lbl">RECEIVER</text>
-    <line x1="510" y1="60" x2="900" y2="60" stroke="rgba(236,230,220,0.07)"/>
-    <clipPath id="clipR"><rect class="fillbox type-r" x="528" y="72" width="340" height="20"/></clipPath>
-    <g clip-path="url(#clipR)">
-      <text x="530" y="86"><tspan class="dim">$ </tspan><tspan class="ink">airpipe download RIVER FALCON MARBLE 42</tspan><tspan class="caret ink" font-weight="700">&#9608;</tspan></text>
-    </g>
-    <text x="530" y="112" class="acc a38" font-weight="700">AirPipe &#183; download</text>
-    <text x="530" y="134" class="a40"><tspan class="dim">Passphrase: </tspan><tspan class="acc">RIVER FALCON MARBLE 42</tspan></text>
-    <text x="530" y="156" class="a40"><tspan class="dim">Destination: </tspan><tspan class="ink">.</tspan></text>
-    <text x="530" y="196" class="dim a43">Looking up&#8230;</text>
-    <text x="530" y="218" class="dim a46">No mailbox transfer; opening direct&#8230;</text>
-    <g class="a61">
-      <rect x="530" y="252" width="320" height="9" rx="4.5" fill="#221C17"/>
-      <rect class="fillbox prog" x="530" y="252" width="320" height="9" rx="4.5" fill="#FF4F00"/>
-    </g>
-    <text x="530" y="292" class="ok a89">&#10003; Saved: ./demo.zip</text>
-  </g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 830" width="400" height="830" font-family="'JetBrains Mono',Menlo,Consolas,'DejaVu Sans Mono',monospace" role="img" aria-label="AirPipe: the sender runs airpipe send and gets a passphrase; the receiver types it. Both reach the relay only to swap an encrypted WebRTC offer and answer, then the file streams directly between them, encrypted end to end. The relay never gets the key, and if a direct path fails it forwards ciphertext only.">
+<style>
+text{font-size:13px}.t{font-size:12px;font-weight:600}.caps{letter-spacing:.08em}
+.dim{fill:#8D8477}.ink{fill:#ECE6DC}.acc{fill:#FF4F00}.ok{fill:#6FBF73}
+.fb{transform-box:fill-box;transform-origin:left center}.fe{transform-box:fill-box;transform-origin:right center}
+.ft{transform-box:fill-box;transform-origin:center top}.fbt{transform-box:fill-box;transform-origin:center bottom}.ctr{transform-box:fill-box;transform-origin:center}
+/* one shared 15s clock; packets loop at 1s so they stay in phase */
+.A{animation:15s linear infinite}
+.live{animation-name:live}@keyframes live{0.000%{opacity:0}1.333%{opacity:1}96.000%{opacity:1;animation-timing-function:cubic-bezier(.4,0,1,1)}99.667%,100%{opacity:0}}.tyS{animation-name:tyS}@keyframes tyS{0%,2.000%{transform:scaleX(0);animation-timing-function:steps(21,end)}8.667%,100%{transform:scaleX(1)}}.cmS{animation-name:cmS}@keyframes cmS{0%,2.000%{transform:translateX(0);animation-timing-function:steps(21,end)}8.667%,100%{transform:translateX(163.8px)}}.cvS{animation-name:cvS}@keyframes cvS{0%,0.067%{opacity:1}9.667%{opacity:1}9.733%,100%{opacity:0}}.a1{animation-name:a1}@keyframes a1{0%,9.667%{opacity:0}9.733%,100%{opacity:1}}.a2{animation-name:a2}@keyframes a2{0%,11.000%{opacity:0}11.067%,100%{opacity:1}}.pp{animation-name:pp}@keyframes pp{0%,12.667%{opacity:0;transform:scale(.96);animation-timing-function:cubic-bezier(0,0,.3,1)}14.333%,100%{opacity:1;transform:scale(1)}}.a3{animation-name:a3}@keyframes a3{0%,15.667%{opacity:0}15.733%,100%{opacity:1}}.a4{animation-name:a4}@keyframes a4{0%,40.667%{opacity:0}40.733%,100%{opacity:1}}.a5{animation-name:a5}@keyframes a5{0%,84.000%{opacity:0}84.067%,100%{opacity:1}}.cvR{animation-name:cvR}@keyframes cvR{0.000%{opacity:1}5.333%{opacity:1}5.400%{opacity:0}8.667%{opacity:0}8.733%{opacity:1}12.667%{opacity:1}12.733%{opacity:0}16.000%{opacity:0}16.067%{opacity:1}32.000%{opacity:1}32.067%,100%{opacity:0}}.tyR{animation-name:tyR}@keyframes tyR{0%,21.333%{transform:scaleX(0);animation-timing-function:steps(17,end)}25.133%{transform:scaleX(0.4359)}26.133%{transform:scaleX(0.4359);animation-timing-function:steps(22,end)}31.000%,100%{transform:scaleX(1)}}.cmR{animation-name:cmR}@keyframes cmR{0%,21.333%{transform:translateX(0);animation-timing-function:steps(17,end)}25.133%{transform:translateX(132.6px)}26.133%{transform:translateX(132.6px);animation-timing-function:steps(22,end)}31.000%,100%{transform:translateX(304.2px)}}.b1{animation-name:b1}@keyframes b1{0%,32.000%{opacity:0}32.067%,100%{opacity:1}}.b2{animation-name:b2}@keyframes b2{0%,33.333%{opacity:0}33.400%,100%{opacity:1}}.b3{animation-name:b3}@keyframes b3{0%,35.333%{opacity:0}35.400%{opacity:1}37.333%{opacity:1}37.400%,100%{opacity:0}}.b4{animation-name:b4}@keyframes b4{0%,37.333%{opacity:0}37.400%,100%{opacity:1}}.b5{animation-name:b5}@keyframes b5{0%,85.333%{opacity:0}85.400%,100%{opacity:1}}.drS{animation-name:drS}@keyframes drS{0%,16.000%{transform:scaleY(0);animation-timing-function:cubic-bezier(0,0,.3,1)}18.333%,100%{transform:scaleY(1)}}.drR{animation-name:drR}@keyframes drR{0%,37.333%{transform:scaleY(0);animation-timing-function:cubic-bezier(0,0,.3,1)}39.667%,100%{transform:scaleY(1)}}.sgS{animation-name:sgS}@keyframes sgS{0%,16.000%{opacity:0}16.067%{opacity:1}57.000%{opacity:1;animation-timing-function:cubic-bezier(.4,0,1,1)}60.333%,100%{opacity:0}}.sgR{animation-name:sgR}@keyframes sgR{0%,37.333%{opacity:0}37.400%{opacity:1}57.000%{opacity:1;animation-timing-function:cubic-bezier(.4,0,1,1)}60.333%,100%{opacity:0}}.lo{animation-name:lo}@keyframes lo{0%,41.667%{opacity:0}42.667%{opacity:1}48.667%{opacity:1}49.667%,100%{opacity:0}}.la{animation-name:la}@keyframes la{0%,49.333%{opacity:0}50.333%{opacity:1}57.000%{opacity:1;animation-timing-function:cubic-bezier(.4,0,1,1)}60.333%,100%{opacity:0}}.relay{animation-name:relay}@keyframes relay{0%,18.333%{stroke:rgba(236,230,220,.18);stroke-width:1px}19.667%{stroke:#FF4F00;stroke-width:1px}39.667%{stroke:#FF4F00;stroke-width:1px}41.000%{stroke:#FF8A50;stroke-width:2px}42.333%{stroke:#FF4F00;stroke-width:1px}45.790%{stroke:#FF4F00;stroke-width:1px}46.365%{stroke:#FF8A50;stroke-width:2px}46.939%{stroke:#FF4F00;stroke-width:1px}52.061%{stroke:#FF4F00;stroke-width:1px}52.635%{stroke:#FF8A50;stroke-width:2px}53.210%{stroke:#FF4F00;stroke-width:1px}57.000%{stroke:#FF4F00;stroke-width:1px;animation-timing-function:cubic-bezier(.4,0,1,1)}60.333%,100%{stroke:rgba(236,230,220,.18);stroke-width:1px}}.d1{animation-name:d1}@keyframes d1{0%,42.333%{opacity:0;transform:translate(0,0)}42.400%{opacity:1;transform:translate(0,0);animation-timing-function:cubic-bezier(0.45, 0, 0.55, 1)}49.000%{opacity:1;transform:translate(0px,220px)}49.067%,100%{opacity:0;transform:translate(0px,220px)}}.d1t1{animation-name:d1t1}@keyframes d1t1{0%,42.600%{opacity:0;transform:translate(0,0)}42.667%{opacity:1;transform:translate(0,0);animation-timing-function:cubic-bezier(0.45, 0, 0.55, 1)}49.267%{opacity:1;transform:translate(0px,220px)}49.333%,100%{opacity:0;transform:translate(0px,220px)}}.d1t2{animation-name:d1t2}@keyframes d1t2{0%,42.867%{opacity:0;transform:translate(0,0)}42.933%{opacity:1;transform:translate(0,0);animation-timing-function:cubic-bezier(0.45, 0, 0.55, 1)}49.533%{opacity:1;transform:translate(0px,220px)}49.600%,100%{opacity:0;transform:translate(0px,220px)}}.d2{animation-name:d2}@keyframes d2{0%,50.000%{opacity:0;transform:translate(0,0)}50.067%{opacity:1;transform:translate(0,0);animation-timing-function:cubic-bezier(0.45, 0, 0.55, 1)}56.667%{opacity:1;transform:translate(0px,-220px)}56.733%,100%{opacity:0;transform:translate(0px,-220px)}}.d2t1{animation-name:d2t1}@keyframes d2t1{0%,50.267%{opacity:0;transform:translate(0,0)}50.333%{opacity:1;transform:translate(0,0);animation-timing-function:cubic-bezier(0.45, 0, 0.55, 1)}56.933%{opacity:1;transform:translate(0px,-220px)}57.000%,100%{opacity:0;transform:translate(0px,-220px)}}.d2t2{animation-name:d2t2}@keyframes d2t2{0%,50.533%{opacity:0;transform:translate(0,0)}50.600%{opacity:1;transform:translate(0,0);animation-timing-function:cubic-bezier(0.45, 0, 0.55, 1)}57.200%{opacity:1;transform:translate(0px,-220px)}57.267%,100%{opacity:0;transform:translate(0px,-220px)}}.fR{animation-name:fR}@keyframes fR{0%,49.000%{stroke:rgba(236,230,220,.12)}49.667%{stroke:rgba(236,230,220,.5)}51.000%,100%{stroke:rgba(236,230,220,.12)}}.fS{animation-name:fS}@keyframes fS{0%,56.667%{stroke:rgba(236,230,220,.12)}57.333%{stroke:rgba(236,230,220,.5)}58.667%,100%{stroke:rgba(236,230,220,.12)}}.dl{animation-name:dl}@keyframes dl{0%,57.667%{stroke-dashoffset:220px;animation-timing-function:cubic-bezier(.2,.8,.2,1)}60.667%,100%{stroke-dashoffset:0px}}.lk{animation-name:lk}@keyframes lk{0%,60.000%{opacity:0;transform:scale(.6);animation-timing-function:cubic-bezier(.34,1.56,.64,1)}62.667%,100%{opacity:1;transform:scale(1)}}.shk{animation-name:shk}@keyframes shk{0%,61.867%{transform:translateY(-2px);animation-timing-function:cubic-bezier(.5,0,1,1)}62.667%,100%{transform:translateY(0)}}.trk{animation-name:trk}@keyframes trk{0%,60.000%{opacity:0}62.000%,100%{opacity:1}}.pl{animation-name:pl}@keyframes pl{0%,62.667%{opacity:0}64.000%,100%{opacity:1}}.pipe{animation-name:pipe}@keyframes pipe{0%,62.000%{opacity:0}63.333%{opacity:1}82.667%{opacity:1}84.000%,100%{opacity:0}}.prS{animation-name:prS}@keyframes prS{0%,63.000%{transform:scaleX(0)}81.000%{transform:scaleX(.9);animation-timing-function:cubic-bezier(.25,.25,.3,1)}83.000%,100%{transform:scaleX(1)}}.prR{animation-name:prR}@keyframes prR{0%,64.000%{transform:scaleX(0)}82.000%{transform:scaleX(.9);animation-timing-function:cubic-bezier(.25,.25,.3,1)}84.000%,100%{transform:scaleX(1)}}.d1.tr1{animation-name:d1t1}.d1.tr2{animation-name:d1t2}.d2.tr1{animation-name:d2t1}.d2.tr2{animation-name:d2t2}
+.pk{animation:pk 1s linear infinite}.k1{animation-delay:-.25s}.k2{animation-delay:-.5s}.k3{animation-delay:-.75s}
+@keyframes pk{0%{opacity:0;transform:translateY(0)}10%,90%{opacity:1}100%{opacity:0;transform:translateY(210px)}}
+@media (prefers-reduced-motion:reduce){*{animation-play-state:paused!important;animation-delay:-13.5s!important}}
+</style>
+<rect width="400" height="830" rx="14" fill="#14100D"/>
+<g transform="translate(5 5)">
+<rect class="A fS" x=".5" y=".5" width="389" height="299" rx="10" fill="#100D0A" stroke="rgba(236,230,220,.12)"/>
+<circle cx="18" cy="16" r="5" fill="#2A231D"/><circle cx="34" cy="16" r="5" fill="#2A231D"/><circle cx="50" cy="16" r="5" fill="#2A231D"/>
+<text x="195.0" y="20" text-anchor="middle" class="t dim">sender &#8212; zsh</text>
+<line x1="0" y1="32.5" x2="390" y2="32.5" stroke="rgba(236,230,220,.07)"/>
+<g class="A live"><text x="20" y="58" class="dim">$</text>
+<clipPath id="tyS"><rect class="A fb tyS" x="34.6" y="43" width="164.79999999999998" height="21"/></clipPath>
+<g clip-path="url(#tyS)"><text x="35.6" y="58" class="ink" textLength="163.8" lengthAdjust="spacing">airpipe send demo.zip</text></g>
+<g class="A cvS"><rect class="A cmS" x="35.6" y="47" width="7.4" height="14" fill="#ECE6DC"/></g>
+<text x="20" y="80" class="A a1" font-weight="700"><tspan class="acc">AirPipe</tspan><tspan class="dim" font-weight="400"> &#183; send</tspan></text>
+<text x="20" y="124" class="A a2" xml:space="preserve"><tspan class="ink" font-weight="700">demo.zip</tspan><tspan class="dim">  4.2 MB</tspan></text>
+<g class="A pp ctr"><rect x="20.5" y="133.5" width="213" height="39" rx="4" fill="rgba(255,79,0,.08)" stroke="#FF4F00"/>
+<text x="34" y="157.5" class="acc" font-weight="700" textLength="184.8" lengthAdjust="spacing">DUSK PINE ECHO GUST 42</text></g>
+<text x="20" y="190" class="A a3 dim">Waiting for receiver to join...</text>
+<text x="20" y="234" class="A a4 ok">&#10003; Receiver joined</text>
+<g class="A trk"><rect x="20" y="248" width="350" height="8" rx="1" fill="#221C17"/><rect class="A fb prS" x="20" y="248" width="350" height="8" rx="1" fill="#FF4F00"/></g>
+<text x="20" y="278" class="A a5" xml:space="preserve"><tspan class="ok">&#10003; Sent </tspan><tspan class="ink">demo.zip</tspan><tspan class="dim">  (4.2 MB)</tspan></text></g>
+</g>
+<g transform="translate(5 525)">
+<rect class="A fR" x=".5" y=".5" width="389" height="299" rx="10" fill="#100D0A" stroke="rgba(236,230,220,.12)"/>
+<circle cx="18" cy="16" r="5" fill="#2A231D"/><circle cx="34" cy="16" r="5" fill="#2A231D"/><circle cx="50" cy="16" r="5" fill="#2A231D"/>
+<text x="195.0" y="20" text-anchor="middle" class="t dim">receiver &#8212; zsh</text>
+<line x1="0" y1="32.5" x2="390" y2="32.5" stroke="rgba(236,230,220,.07)"/>
+<g class="A live"><text x="20" y="58" class="dim">$</text>
+<clipPath id="tyR"><rect class="A fb tyR" x="34.6" y="43" width="305.2" height="21"/></clipPath>
+<g clip-path="url(#tyR)"><text x="35.6" y="58" class="ink" textLength="304.2" lengthAdjust="spacing">airpipe download DUSK PINE ECHO GUST 42</text></g>
+<g class="A cvR"><rect class="A cmR" x="35.6" y="47" width="7.4" height="14" fill="#ECE6DC"/></g>
+<text x="20" y="80" class="A b1" font-weight="700"><tspan class="acc">AirPipe</tspan><tspan class="dim" font-weight="400"> &#183; download</tspan></text>
+<g class="A b2"><text x="20" y="124" class="ink">Passphrase: <tspan class="acc">DUSK PINE ECHO GUST 42</tspan></text>
+<text x="20" y="146" class="ink">Destination: <tspan font-weight="700">.</tspan></text></g>
+<text x="20" y="168" class="A b3 ink">Looking up...</text>
+<g class="A b4 dim"><text x="20" y="168">No mailbox transfer; opening direct</text><text x="20" y="190">connection...</text></g>
+<g class="A trk"><rect x="20" y="248" width="350" height="8" rx="1" fill="#221C17"/><rect class="A fb prR" x="20" y="248" width="350" height="8" rx="1" fill="#FF4F00"/></g>
+<text x="20" y="278" class="A b5 ok">&#10003; Saved: demo.zip</text></g>
+</g>
+<g class="A live">
+<clipPath id="cS"><rect class="A ft drS" x="326" y="305" width="8" height="137"/></clipPath><clipPath id="cR"><rect class="A fbt drR" x="326" y="468" width="8" height="57"/></clipPath>
+<g class="A sgS"><g clip-path="url(#cS)"><line x1="330" y1="305" x2="330.0" y2="442" stroke="#ECE6DC" stroke-opacity=".5" stroke-width="1.5" stroke-dasharray="3 4"/></g>
+<circle cx="330" cy="305" r="2.5" fill="#8D8477"/></g>
+<g class="A sgR"><g clip-path="url(#cR)"><line x1="330" y1="525" x2="330.0" y2="468" stroke="#ECE6DC" stroke-opacity=".5" stroke-width="1.5" stroke-dasharray="3 4"/></g>
+<circle cx="330" cy="525" r="2.5" fill="#8D8477"/></g>
+<g opacity=".25"><circle class="A d1 tr2" cx="330" cy="305" r="3" fill="#FF4F00"/><circle class="A d2 tr2" cx="330" cy="525" r="3" fill="#FF4F00"/></g>
+<g opacity=".5"><circle class="A d1 tr1" cx="330" cy="305" r="4" fill="#FF4F00"/><circle class="A d2 tr1" cx="330" cy="525" r="4" fill="#FF4F00"/></g>
+<circle class="A d1" cx="330" cy="305" r="5" fill="#FF4F00"/><circle class="A d2" cx="330" cy="525" r="5" fill="#FF4F00"/>
+<rect class="A relay" x="288" y="442" width="84" height="26" rx="13" fill="#100D0A" stroke="rgba(236,230,220,.18)"/>
+<text x="330.0" y="459.0" text-anchor="middle" class="t dim caps">RELAY</text>
+<text x="278" y="433" text-anchor="end" class="t dim">pairs peers</text><text x="278" y="449" text-anchor="end" class="t dim">never gets the key</text><text x="278" y="469" text-anchor="end" class="t dim">fallback relays</text><text x="278" y="485" text-anchor="end" class="t dim">ciphertext only</text>
+<text x="318" y="340" text-anchor="end" class="A lo t dim">encrypted offer &#8595;</text>
+<text x="318" y="340" text-anchor="end" class="A la t dim">encrypted answer &#8593;</text>
+<line class="A dl" x1="45" y1="305" x2="45" y2="525" stroke="#FF4F00" stroke-width="2" stroke-dasharray="220"/>
+<g class="A pipe"><rect class="pk k0" x="43.5" y="305" width="3" height="10" rx="1.5" fill="#ECE6DC"/><rect class="pk k1" x="43.5" y="305" width="3" height="10" rx="1.5" fill="#ECE6DC"/><rect class="pk k2" x="43.5" y="305" width="3" height="10" rx="1.5" fill="#ECE6DC"/><rect class="pk k3" x="43.5" y="305" width="3" height="10" rx="1.5" fill="#ECE6DC"/></g>
+<g class="A lk ctr"><circle cx="45" cy="366" r="12" fill="#14100D" stroke="#3A3029" stroke-width="1.5"/>
+<path class="A shk" d="M41.5 364v-2.5a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="#FF4F00" stroke-width="1.5"/>
+<rect x="39" y="364" width="12" height="8" rx="2" fill="#FF4F00"/><circle cx="45" cy="367.5" r="1.2" fill="#14100D"/></g>
+<g class="A pl"><text x="69" y="362" text-anchor="start" class="t ink">direct &#183; WebRTC</text>
+<text x="69" y="380" text-anchor="start" class="t dim">end-to-end encrypted</text></g>
+</g>
 </svg>

@@ -8,7 +8,7 @@ Send a file to any device by sharing a passphrase. It streams straight from one 
 
 ## How it works
 
-The sender picks a file and gets a passphrase like `RIVER FALCON MARBLE 42`. The receiver enters it on the website, in the terminal (`airpipe download RIVER FALCON MARBLE 42`), or by scanning the QR. The file then transfers directly between the two devices, encrypted the whole way.
+The sender picks a file and gets a passphrase like `DUSK PINE ECHO GUST 42`. The receiver enters it on the website, in the terminal (`airpipe download DUSK PINE ECHO GUST 42`), or by scanning the QR. The file then transfers directly between the two devices, encrypted the whole way.
 
 If the receiver is offline, the sender can use **mailbox** mode: the relay holds the encrypted file for 10 minutes until it's picked up. Same passphrase either way. The receiver never has to know which mode was used.
 
@@ -58,7 +58,7 @@ v5 changed how a passphrase becomes a key, so v5 can't exchange files with v4 or
 ```bash
 airpipe send report.pdf              # prompts: direct (P2P) or mailbox
 airpipe send file1.txt photos/       # multiple files / folders auto-zip
-airpipe download RIVER FALCON MARBLE 42
+airpipe download DUSK PINE ECHO GUST 42
 airpipe receive ./downloads          # wait for someone to send to you; prints a QR
 ```
 
