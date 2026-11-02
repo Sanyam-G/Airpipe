@@ -5,7 +5,7 @@ import "fmt"
 func printUsage() {
 	fmt.Printf("Usage: %sairpipe%s send [--stay-open] [--mode p2p|mailbox] <file> [file2...]\n", colorBold, colorReset)
 	fmt.Printf("       %sairpipe%s receive [--stay-open] [dir]\n", colorBold, colorReset)
-	fmt.Printf("       %sairpipe%s download [--stay-open] <WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
+	fmt.Printf("       %sairpipe%s download [--stay-open] <WORD WORD WORD WORD NN> [dir]\n", colorBold, colorReset)
 	fmt.Printf("       %sairpipe%s update\n", colorBold, colorReset)
 	fmt.Printf("       %sairpipe%s version\n", colorBold, colorReset)
 	fmt.Printf("       %sairpipe%s help\n\n", colorBold, colorReset)
@@ -34,7 +34,7 @@ func printHelp() {
 	fmt.Printf("      Wait for someone to send a file to you. Defaults to current directory.\n")
 	fmt.Printf("      %s--stay-open%s keeps the session open for more batches.\n\n", b, r)
 
-	fmt.Printf("  %sdownload%s [--stay-open] <WORD WORD WORD NN> [dir]\n", b, r)
+	fmt.Printf("  %sdownload%s [--stay-open] <WORD WORD WORD WORD NN> [dir]\n", b, r)
 	fmt.Printf("      Download mailbox or live payloads using a passphrase someone shared.\n")
 	fmt.Printf("      Mailbox bundles with several files decrypt to separate saves.\n")
 	fmt.Printf("      With live p2p, %s--stay-open%s waits for extra batches after the first.\n\n", b, r)

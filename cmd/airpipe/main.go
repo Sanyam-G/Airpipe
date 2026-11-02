@@ -52,7 +52,7 @@ func main() {
 		err = cmdReceive(*relay, dir, stayOpen)
 	case "download":
 		if len(args) < 2 {
-			fmt.Println("Usage: airpipe download [--stay-open] <WORD WORD WORD NN> [dir]")
+			fmt.Println("Usage: airpipe download [--stay-open] <WORD WORD WORD WORD NN> [dir]")
 			os.Exit(1)
 		}
 		err = cmdDownload(*relay, args[1:])
