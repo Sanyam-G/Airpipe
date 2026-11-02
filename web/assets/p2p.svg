@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 312" width="720" height="312" font-family="'JetBrains Mono','SFMono-Regular',ui-monospace,monospace" role="img" aria-label="How AirPipe connects: sender and receiver reach the relay only to exchange encrypted signaling, then the file streams directly between them over WebRTC, encrypted end to end. The key stays on the two devices; if a direct path fails, the relay forwards ciphertext.">
+  <style>
+    text { font-size: 13px; }
+    .dim { fill: #8D8477; }
+    .ink { fill: #ECE6DC; }
+    .acc { fill: #FF4F00; }
+    .lbl { font-size: 10px; letter-spacing: 1.5px; font-weight: 700; }
+    .sm  { font-size: 11px; }
+    .fb  { transform-box: fill-box; transform-origin: center; }
+
+    /* one shared 9s clock; packets loop at 1s so they stay in phase */
+    .sig,.relay,.d1,.d2,.dline,.on,.lock { animation-duration: 9s; animation-timing-function: ease-in-out; animation-iteration-count: infinite; }
+    .pkt { animation: flow 1s linear infinite; }
+
+    .sig   { animation-name: sig }
+    .relay { animation-name: relay }
+    .d1    { animation-name: d1 }
+    .d2    { animation-name: d2 }
+    .dline { animation-name: dline }
+    .on    { animation-name: on }
+    .lock  { animation-name: lock }
+
+    @keyframes sig   { 0% {opacity:0} 4%,44% {opacity:1} 52%,92% {opacity:.14} 100% {opacity:0} }
+    @keyframes relay { 0%,3% {stroke:rgba(236,230,220,.12)} 6%,44% {stroke:#FF4F00} 52%,100% {stroke:rgba(236,230,220,.12)} }
+    /* offer: sender -> relay -> receiver */
+    @keyframes d1 { 0%,6% {opacity:0; transform:translate(0,0)} 7% {opacity:1; transform:translate(0,0)}
+                    15% {transform:translate(142px,-82px)} 18% {transform:translate(278px,-82px)}
+                    26% {opacity:1; transform:translate(420px,0)} 27%,100% {opacity:0; transform:translate(420px,0)} }
+    /* answer: receiver -> relay -> sender */
+    @keyframes d2 { 0%,27% {opacity:0; transform:translate(0,0)} 28% {opacity:1; transform:translate(0,0)}
+                    35% {transform:translate(-142px,-82px)} 38% {transform:translate(-278px,-82px)}
+                    44% {opacity:1; transform:translate(-420px,0)} 45%,100% {opacity:0; transform:translate(-420px,0)} }
+    @keyframes dline { 0%,46% {stroke-dashoffset:328; opacity:1} 54%,92% {stroke-dashoffset:0; opacity:1} 97%,100% {stroke-dashoffset:0; opacity:0} }
+    @keyframes on    { 0%,53% {opacity:0} 56%,92% {opacity:1} 97%,100% {opacity:0} }
+    @keyframes lock  { 0%,49% {opacity:0; transform:scale(.4)} 53% {opacity:1; transform:scale(1.15)} 56%,92% {opacity:1; transform:scale(1)} 97%,100% {opacity:0; transform:scale(1)} }
+    @keyframes flow  { 0% {opacity:0; transform:translateX(0)} 12%,88% {opacity:1} 100% {opacity:0; transform:translateX(312px)} }
+  </style>
+
+  <rect width="720" height="312" rx="14" fill="#14100D"/>
+
+  <!-- signaling: both ends dial out to the relay -->
+  <g class="sig" stroke="#ECE6DC" stroke-opacity=".45" stroke-width="1.2" stroke-dasharray="3 5" fill="none">
+    <line x1="150" y1="166" x2="292" y2="84"/>
+    <line x1="428" y1="84" x2="570" y2="166"/>
+  </g>
+  <g class="sig">
+    <text x="208" y="112" text-anchor="end" class="dim sm">signal</text>
+    <text x="512" y="112" class="dim sm">signal</text>
+  </g>
+  <circle class="d1" cx="150" cy="166" r="4" fill="#FF4F00"/>
+  <circle class="d2" cx="570" cy="166" r="4" fill="#FF4F00"/>
+
+  <!-- relay -->
+  <rect class="relay" x="290" y="40" width="140" height="44" rx="8" fill="#100D0A" stroke="rgba(236,230,220,.12)" stroke-width="1.2"/>
+  <text x="360" y="66" text-anchor="middle" class="acc lbl">RELAY</text>
+  <text x="360" y="104" text-anchor="middle" class="dim sm">pairs · never gets key</text>
+  <text x="360" y="120" text-anchor="middle" class="dim sm" opacity=".6">fallback: ciphertext only</text>
+
+  <!-- direct data path -->
+  <line x1="196" y1="211" x2="524" y2="211" stroke="#221C17" stroke-width="3"/>
+  <line class="dline" x1="196" y1="211" x2="524" y2="211" stroke="#FF4F00" stroke-width="3" stroke-linecap="round" stroke-dasharray="328"/>
+  <g class="on">
+    <circle class="pkt" cx="204" cy="211" r="4.5" fill="#ECE6DC"/>
+    <circle class="pkt" cx="204" cy="211" r="4.5" fill="#ECE6DC" style="animation-delay:-.33s"/>
+    <circle class="pkt" cx="204" cy="211" r="4.5" fill="#ECE6DC" style="animation-delay:-.66s"/>
+    <text x="360" y="194" text-anchor="middle" class="ink lbl">DIRECT · WebRTC</text>
+    <text x="360" y="244" text-anchor="middle" class="dim sm">E2E · NaCl</text>
+  </g>
+  <g class="lock fb">
+    <circle cx="360" cy="211" r="13" fill="#14100D" stroke="#FF4F00" stroke-width="1.5"/>
+    <path d="M355.5 209v-3a4.5 4.5 0 0 1 9 0v3" fill="none" stroke="#FF4F00" stroke-width="1.6"/>
+    <rect x="353" y="209" width="14" height="9" rx="1.5" fill="#FF4F00"/>
+  </g>
+
+  <!-- sender: terminal -->
+  <rect x="40" y="166" width="156" height="90" rx="10" fill="#100D0A" stroke="rgba(236,230,220,.12)"/>
+  <circle cx="56" cy="181" r="3.5" fill="#FF4F00"/><circle cx="67" cy="181" r="3.5" fill="#221C17"/><circle cx="78" cy="181" r="3.5" fill="#221C17"/>
+  <line x1="40" y1="192" x2="196" y2="192" stroke="rgba(236,230,220,.07)"/>
+  <text x="52" y="214" class="sm"><tspan class="dim">$ </tspan><tspan class="ink">airpipe send</tspan></text>
+  <text x="52" y="238" class="acc sm" font-weight="700">RIVER FALCON …</text>
+  <text x="118" y="278" text-anchor="middle" class="acc lbl">SENDER</text>
+  <text x="118" y="293" text-anchor="middle" class="dim sm">terminal</text>
+
+  <!-- receiver: phone or browser -->
+  <rect x="524" y="166" width="156" height="90" rx="10" fill="#100D0A" stroke="rgba(236,230,220,.12)"/>
+  <circle cx="540" cy="181" r="3.5" fill="#FF4F00"/><circle cx="551" cy="181" r="3.5" fill="#221C17"/><circle cx="562" cy="181" r="3.5" fill="#221C17"/>
+  <line x1="524" y1="192" x2="680" y2="192" stroke="rgba(236,230,220,.07)"/>
+  <rect x="534" y="200" width="136" height="20" rx="5" fill="#221C17"/>
+  <text x="542" y="214" class="sm"><tspan class="dim">/d/3fa9…</tspan><tspan class="acc" font-weight="700">#key</tspan></text>
+  <text x="534" y="240" class="dim sm">#key stays local</text>
+  <text x="602" y="278" text-anchor="middle" class="acc lbl">RECEIVER</text>
+  <text x="602" y="293" text-anchor="middle" class="dim sm">phone · browser</text>
+</svg>

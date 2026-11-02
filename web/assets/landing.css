@@ -520,6 +520,10 @@ main > section { border-bottom: 1px solid var(--line); }
 
 .how { display: grid; grid-template-columns: 1fr 1fr 1fr; }
 
+.how-fig { grid-column: 1 / -1; padding: clamp(40px, 6vh, 72px) var(--gx) 0; }
+.how-fig img { display: block; width: 100%; max-width: 720px; height: auto; margin: 0 auto; }
+@media (max-width: 600px) { .how-fig img { max-width: 384px; } }
+
 .how-cell {
   padding: clamp(40px, 6vh, 72px) var(--gx) clamp(44px, 7vh, 80px);
   position: relative;

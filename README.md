@@ -8,6 +8,8 @@ Send a file to any device by sharing a passphrase. It streams straight from one 
 
 ## How it works
 
+![How AirPipe connects: both ends reach the relay only for encrypted signaling, then the file streams directly over WebRTC, encrypted end to end; the key never reaches the relay](web/assets/p2p.svg)
+
 The sender picks a file and gets a passphrase like `RIVER FALCON MARBLE 42`. The receiver enters it on the website, in the terminal (`airpipe download RIVER FALCON MARBLE 42`), or by scanning the QR. The file then transfers directly between the two devices, encrypted the whole way.
 
 If the receiver is offline, the sender can use **mailbox** mode: the relay holds the encrypted file for 10 minutes until it's picked up. Same passphrase either way. The receiver never has to know which mode was used.
