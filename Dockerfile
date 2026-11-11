@@ -6,8 +6,10 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 go build -ldflags "-X main.buildVersion=${VERSION}" -o /relay ./cmd/relay
 
-FROM alpine:3.19
+FROM alpine:3.24
 COPY --from=build /relay /relay
+# The relay only listens on 8080 and writes mailboxes under /tmp.
+USER nobody
 EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget -qO /dev/null "http://localhost:${PORT:-8080}/health" || exit 1
