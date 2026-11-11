@@ -80,3 +80,31 @@ func TestCheckRelay(t *testing.T) {
 		}
 	}
 }
+
+func TestDownloadReleaseVerifiesChecksum(t *testing.T) {
+	const sumOfHello = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+	var digest string
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/bin" {
+			fmt.Fprint(w, "hello")
+			return
+		}
+		fmt.Fprintf(w, `{"assets":[{"name":"airpipe-test","browser_download_url":"%s/bin","digest":"%s"}]}`, srv.URL, digest)
+	}))
+	defer srv.Close()
+
+	digest = "sha256:" + sumOfHello
+	if got, err := downloadRelease(srv.URL, "airpipe-test"); err != nil || string(got) != "hello" {
+		t.Fatalf("matching checksum: %q, %v", got, err)
+	}
+	for _, bad := range []string{"sha256:" + sumOfHello[:63] + "0", ""} {
+		digest = bad
+		if _, err := downloadRelease(srv.URL, "airpipe-test"); err == nil {
+			t.Fatalf("digest %q should be rejected", bad)
+		}
+	}
+	if _, err := downloadRelease(srv.URL, "airpipe-other"); err == nil {
+		t.Fatal("missing asset should be an error")
+	}
+}
