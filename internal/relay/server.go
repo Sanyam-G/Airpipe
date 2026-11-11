@@ -27,6 +27,10 @@ var legacyToken = regexp.MustCompile(`^[0-9a-f]{16}$`)
 // Sent as a WebSocket close reason, so it must stay under 123 bytes.
 const legacyClientMsg = "This relay runs AirPipe v5 and your client is older. Update with: airpipe update (or brew upgrade airpipe)"
 
+// Clients send 64 KB chunks plus a few bytes of framing; anything near this
+// limit is not an AirPipe client.
+const maxWSMessageBytes = 1 << 20
+
 type Server struct {
 	cfg         Config
 	log         *slog.Logger
@@ -46,7 +50,7 @@ type Server struct {
 }
 
 func New(parent context.Context, cfg Config, log *slog.Logger, version string) (*Server, error) {
-	store, err := NewFileStore(parent, log, cfg.FileExpiry)
+	store, err := NewFileStore(parent, log, cfg.FileExpiry, cfg.MaxStoreBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +94,9 @@ func (s *Server) Routes() http.Handler {
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	if token == "" {
-		http.Error(w, "missing token", http.StatusBadRequest)
+	legacy := legacyToken.MatchString(token)
+	if !legacy && !validToken.MatchString(token) {
+		http.Error(w, "invalid token", http.StatusBadRequest)
 		return
 	}
 	conn, err := s.upgrader.Upgrade(w, r, nil)
@@ -100,8 +105,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+	conn.SetReadLimit(maxWSMessageBytes)
 
-	if legacyToken.MatchString(token) {
+	if legacy {
 		// Old clients only print errors read from an open socket, so close with
 		// the reason and wait for their close reply before dropping TCP.
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, legacyClientMsg))
@@ -143,9 +149,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes)
+	// Count the request against the store cap as it arrives, so parallel
+	// uploads can't overshoot it while they are still being received.
+	body := &quotaReader{ReadCloser: http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes), store: s.fileStore}
+	var kept int64
+	defer func() { s.fileStore.Release(body.n - kept) }()
+	r.Body = body
 
 	file, header, err := r.FormFile("file")
+	if body.full {
+		http.Error(w, "relay storage is full, try again in a few minutes", http.StatusInsufficientStorage)
+		return
+	}
 	if err != nil {
 		http.Error(w, "upload failed: "+err.Error(), http.StatusBadRequest)
 		return
@@ -174,6 +189,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sf, ok := s.fileStore.Get(token); ok {
+		kept = sf.Size
 		s.uploadsTotal.Add(1)
 		s.uploadBytesTotal.Add(sf.Size)
 	}
