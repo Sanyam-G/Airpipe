@@ -14,16 +14,19 @@ RELAY="__RELAY_URL__"
 URL="https://github.com/Sanyam-G/Airpipe/releases/latest/download/airpipe-${OS}-${ARCH}"
 
 echo "Downloading airpipe for ${OS}-${ARCH}..."
-curl -sL "$URL" -o /tmp/airpipe
-chmod +x /tmp/airpipe
+TMP=$(mktemp)
+trap 'rm -f "$TMP"' EXIT
+# -f: a 404 or error page must fail here, not get installed as the binary
+curl -fsSL "$URL" -o "$TMP"
+chmod 755 "$TMP"
 
 # Install to /usr/local/bin, use sudo if needed
 if [ -w /usr/local/bin ]; then
-    mv /tmp/airpipe /usr/local/bin/airpipe
+    mv "$TMP" /usr/local/bin/airpipe
     echo "Installed to /usr/local/bin/airpipe"
 else
     echo "Need sudo to install to /usr/local/bin"
-    sudo mv /tmp/airpipe /usr/local/bin/airpipe
+    sudo mv "$TMP" /usr/local/bin/airpipe
     echo "Installed to /usr/local/bin/airpipe"
 fi
 
