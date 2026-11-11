@@ -1,7 +1,7 @@
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/QY=
-github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
+github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aNNg=
+github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/pion/datachannel v1.6.3 h1:HZAYLpunVI0xi057ZiANl558d0uSpomcWw4UEPz3qXs=
 github.com/pion/datachannel v1.6.3/go.mod h1:oRmkXVVXxkUbqa8MatgdNHW29kvtQY3HUdjJQsfv2GE=
 github.com/pion/dtls/v3 v3.1.15 h1:okWk5LNwU21DfhvG8z4wm45knHVSPEdkihwp6BxfQcc=

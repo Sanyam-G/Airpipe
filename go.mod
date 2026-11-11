@@ -3,7 +3,7 @@ module github.com/Sanyam-G/Airpipe/v5
 go 1.25.0
 
 require (
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/pion/webrtc/v4 v4.2.26
 	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	golang.org/x/crypto v0.55.0
