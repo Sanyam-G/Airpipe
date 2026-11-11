@@ -46,7 +46,7 @@ func TestNormalize(t *testing.T) {
 
 // Known-answer vectors. The browser implementation (deriveSecrets in
 // internal/relay/static/airpipe-protocol.js and the copy in web/assets/app.js)
-// must produce the same values; /static/_kdf-check.html checks it in a browser.
+// must produce the same values.
 var deriveVectors = []struct {
 	phrase, token, receiveToken, key string
 }{

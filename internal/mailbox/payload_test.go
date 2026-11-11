@@ -9,8 +9,8 @@ import (
 	"github.com/Sanyam-G/Airpipe/v5/internal/mailbox"
 )
 
-// Canonical fixtures pinning the wire format. The same hex strings live in
-// cmd/relay/static/_amb2-check.html so the JS side asserts byte-equal output.
+// Canonical fixtures pinning the wire format. The JS side in
+// internal/relay/static/airpipe-mailbox.js must produce byte-equal output.
 const fixtureV1Hex = "0000000968656c6c6f2e747874776f726c64"
 
 var fixtureV1Entry = mailbox.Entry{Name: "hello.txt", Content: []byte("world")}
