@@ -619,3 +619,31 @@ func TestWebSocketRejectsBadTokenAndOversizedFrame(t *testing.T) {
 		t.Fatalf("oversized frame should close the socket with 1009, got %v", err)
 	}
 }
+
+func TestRobotsPointsAtSitemapAndPagesHaveShareImage(t *testing.T) {
+	s := newTestServer(t)
+	get := func(path string) string {
+		w := httptest.NewRecorder()
+		s.Routes().ServeHTTP(w, httptest.NewRequest("GET", "http://relay.example"+path, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s: %d", path, w.Code)
+		}
+		return w.Body.String()
+	}
+	if body := get("/robots.txt"); !strings.Contains(body, "Sitemap: http://relay.example/sitemap.xml") {
+		t.Fatalf("robots.txt: %q", body)
+	}
+	sitemap := get("/sitemap.xml")
+	for _, page := range []string{"/", "/send", "/live", "/development"} {
+		if !strings.Contains(sitemap, "<loc>http://relay.example"+page+"</loc>") {
+			t.Errorf("sitemap is missing %s", page)
+		}
+		body := get(page)
+		if !strings.Contains(body, `property="og:image"`) || !strings.Contains(body, `name="twitter:card"`) {
+			t.Errorf("%s has no share image tags", page)
+		}
+	}
+	if !strings.HasPrefix(get("/site/og.png"), "\x89PNG") {
+		t.Fatal("/site/og.png is not a PNG")
+	}
+}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -80,6 +81,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /development", s.handleDevelopmentPage)
 	mux.HandleFunc("GET /send", s.handleSendPage)
 	mux.HandleFunc("GET /install.sh", s.handleInstall)
+	mux.HandleFunc("GET /robots.txt", s.handleRobots)
+	mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	mux.HandleFunc("POST /upload", s.rateLimit(s.handleUploadFile))
 	mux.HandleFunc("GET /d/{token}", s.handleDownloadPage)
 	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
@@ -277,6 +280,13 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	out := strings.Replace(string(content), "__RELAY_URL__", baseURL(r), 1)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(out))
+}
+
+// baseURL is the address the client used to reach this relay.
+func baseURL(r *http.Request) string {
 	scheme := r.Header.Get("X-Forwarded-Proto")
 	if scheme == "" {
 		if r.TLS != nil {
@@ -285,9 +295,22 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 			scheme = "http"
 		}
 	}
-	out := strings.Replace(string(content), "__RELAY_URL__", scheme+"://"+r.Host, 1)
+	return scheme + "://" + r.Host
+}
+
+func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(out))
+	w.Write([]byte("User-agent: *\nAllow: /\n\nSitemap: " + baseURL(r) + "/sitemap.xml\n"))
+}
+
+func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	base := html.EscapeString(baseURL(r))
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n"))
+	for _, p := range []string{"/", "/send", "/live", "/development"} {
+		w.Write([]byte("  <url><loc>" + base + p + "</loc></url>\n"))
+	}
+	w.Write([]byte("</urlset>\n"))
 }
 
 func (s *Server) handleRoomStatus(w http.ResponseWriter, r *http.Request) {
