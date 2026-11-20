@@ -12,6 +12,10 @@ permissions:
 jobs:
   docker:
     runs-on: ubuntu-latest
+    # One image build at a time. A main build that started before its tag
+    # existed then can't push :latest after the tag build; one that waits
+    # behind the tag build describes the commit as the tag anyway.
+    concurrency: relay-image
     steps:
       - uses: actions/checkout@v4
         with:
