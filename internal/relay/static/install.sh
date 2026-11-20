@@ -40,7 +40,8 @@ if [ "$RELAY" != "https://airpipe.sanyamgarg.com" ] && [ "$RELAY" != "__RELAY_UR
     esac
 
     echo
-    if [ -n "$RC" ] && [ -e /dev/tty ]; then
+    # /dev/tty can exist yet fail to open (no controlling terminal).
+    if [ -n "$RC" ] && (: < /dev/tty) 2>/dev/null; then
         printf "Add 'export AIRPIPE_RELAY=%s' to %s? [y/N] " "$RELAY" "$RC"
         read REPLY < /dev/tty
         case "$REPLY" in
