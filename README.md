@@ -47,7 +47,7 @@ Point the CLI at your relay with `export AIRPIPE_RELAY=https://your-server.examp
 ## CLI
 
 ```bash
-curl -sSL https://airpipe.sanyamgarg.com/install.sh | sh
+curl -fsSL https://airpipe.sanyamgarg.com/install.sh | sh
 brew install sanyam-g/airpipe/airpipe
 go install github.com/Sanyam-G/Airpipe/v5/cmd/airpipe@latest
 ```
