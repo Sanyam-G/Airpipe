@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -90,21 +91,24 @@ func TestDownloadReleaseVerifiesChecksum(t *testing.T) {
 			fmt.Fprint(w, "hello")
 			return
 		}
-		fmt.Fprintf(w, `{"assets":[{"name":"airpipe-test","browser_download_url":"%s/bin","digest":"%s"}]}`, srv.URL, digest)
+		fmt.Fprintf(w, `{"tag_name":"v1.1.0","assets":[{"name":"airpipe-test","browser_download_url":"%s/bin","digest":"%s"}]}`, srv.URL, digest)
 	}))
 	defer srv.Close()
 
 	digest = "sha256:" + sumOfHello
-	if got, err := downloadRelease(srv.URL, "airpipe-test"); err != nil || string(got) != "hello" {
+	if got, err := downloadRelease(srv.URL, "airpipe-test", "v1.0.0"); err != nil || string(got) != "hello" {
 		t.Fatalf("matching checksum: %q, %v", got, err)
 	}
 	for _, bad := range []string{"sha256:" + sumOfHello[:63] + "0", ""} {
 		digest = bad
-		if _, err := downloadRelease(srv.URL, "airpipe-test"); err == nil {
+		if _, err := downloadRelease(srv.URL, "airpipe-test", "v1.0.0"); err == nil {
 			t.Fatalf("digest %q should be rejected", bad)
 		}
 	}
-	if _, err := downloadRelease(srv.URL, "airpipe-other"); err == nil {
+	if _, err := downloadRelease(srv.URL, "airpipe-other", "v1.0.0"); err == nil {
 		t.Fatal("missing asset should be an error")
+	}
+	if _, err := downloadRelease(srv.URL, "airpipe-test", "v1.1.0"); !errors.Is(err, errUpToDate) {
+		t.Fatalf("same version: %v, want errUpToDate", err)
 	}
 }

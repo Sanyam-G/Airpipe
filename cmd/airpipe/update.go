@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,7 +30,11 @@ func cmdUpdate() error {
 	fmt.Printf("  Current: %s%s%s\n", colorDim, buildVersion, colorReset)
 	fmt.Printf("  Downloading latest for %s/%s...\n", goos, goarch)
 
-	binary, err := downloadRelease(latestReleaseAPI, asset)
+	binary, err := downloadRelease(latestReleaseAPI, asset, buildVersion)
+	if errors.Is(err, errUpToDate) {
+		fmt.Printf("  %s✓ Already on the latest release%s\n\n", colorGreen, colorReset)
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
@@ -116,10 +121,14 @@ func cmdUpdate() error {
 
 const latestReleaseAPI = "https://api.github.com/repos/Sanyam-G/Airpipe/releases/latest"
 
+var errUpToDate = errors.New("already up to date")
+
 // downloadRelease fetches the named asset of the release described at apiURL
 // and checks it against the SHA-256 digest GitHub records for the asset.
-func downloadRelease(apiURL, asset string) ([]byte, error) {
+// It returns errUpToDate when that release is the current version.
+func downloadRelease(apiURL, asset, current string) ([]byte, error) {
 	var release struct {
+		Tag    string `json:"tag_name"`
 		Assets []struct {
 			Name   string `json:"name"`
 			URL    string `json:"browser_download_url"`
@@ -132,6 +141,9 @@ func downloadRelease(apiURL, asset string) ([]byte, error) {
 	}
 	if err := json.Unmarshal(meta, &release); err != nil {
 		return nil, fmt.Errorf("release info: %w", err)
+	}
+	if release.Tag != "" && release.Tag == current {
+		return nil, errUpToDate
 	}
 	for _, a := range release.Assets {
 		if a.Name != asset {
