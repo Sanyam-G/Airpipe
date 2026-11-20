@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -110,5 +111,28 @@ func TestSafeFilename(t *testing.T) {
 				t.Fatalf("got %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+func TestInterruptedReceiveRemovesPartialFile(t *testing.T) {
+	dir := t.TempDir()
+	meta, err := NewMetadataMessage("half.bin", 10, 2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	msgs := []Message{meta, NewChunkMessage([]byte("hello"))}
+	read := func() (Message, error) {
+		if len(msgs) == 0 {
+			return Message{}, io.ErrUnexpectedEOF
+		}
+		m := msgs[0]
+		msgs = msgs[1:]
+		return m, nil
+	}
+	if _, err := (&Receiver{}).recvFile(read, dir, nil, nil); err == nil {
+		t.Fatal("interrupted transfer should fail")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "half.bin")); !os.IsNotExist(err) {
+		t.Fatalf("partial file left behind: %v", err)
 	}
 }

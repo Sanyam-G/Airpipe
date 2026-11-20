@@ -409,10 +409,15 @@ func (r *Receiver) recvFile(read msgReader, destDir string, progressFn func(rece
 	var file *os.File
 	var bytesReceived int64
 	var destPath string
+	complete := false
 
+	// A transfer that stops part way must not leave a file that looks whole.
 	defer func() {
 		if file != nil {
 			file.Close()
+			if !complete {
+				os.Remove(destPath)
+			}
 		}
 	}()
 
@@ -447,6 +452,7 @@ func (r *Receiver) recvFile(read msgReader, destDir string, progressFn func(rece
 				progressFn(bytesReceived, metadata.Size)
 			}
 		case MsgTypeComplete:
+			complete = true
 			return destPath, true, nil
 		case MsgTypeError:
 			return "", false, fmt.Errorf("sender error: %s", string(msg.Payload))
