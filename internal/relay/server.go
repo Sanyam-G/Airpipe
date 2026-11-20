@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"html"
 	"io/fs"
 	"log/slog"
 	"net/http"
@@ -27,6 +28,10 @@ var legacyToken = regexp.MustCompile(`^[0-9a-f]{16}$`)
 // Sent as a WebSocket close reason, so it must stay under 123 bytes.
 const legacyClientMsg = "This relay runs AirPipe v5 and your client is older. Update with: airpipe update (or brew upgrade airpipe)"
 
+// Clients send 64 KB chunks plus a few bytes of framing; anything near this
+// limit is not an AirPipe client.
+const maxWSMessageBytes = 1 << 20
+
 type Server struct {
 	cfg         Config
 	log         *slog.Logger
@@ -46,7 +51,7 @@ type Server struct {
 }
 
 func New(parent context.Context, cfg Config, log *slog.Logger, version string) (*Server, error) {
-	store, err := NewFileStore(parent, log, cfg.FileExpiry)
+	store, err := NewFileStore(parent, log, cfg.FileExpiry, cfg.MaxStoreBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -76,6 +81,8 @@ func (s *Server) Routes() http.Handler {
 	mux.HandleFunc("GET /development", s.handleDevelopmentPage)
 	mux.HandleFunc("GET /send", s.handleSendPage)
 	mux.HandleFunc("GET /install.sh", s.handleInstall)
+	mux.HandleFunc("GET /robots.txt", s.handleRobots)
+	mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	mux.HandleFunc("POST /upload", s.rateLimit(s.handleUploadFile))
 	mux.HandleFunc("GET /d/{token}", s.handleDownloadPage)
 	mux.HandleFunc("GET /raw/{token}", s.handleRawDownload)
@@ -90,8 +97,9 @@ func (s *Server) Routes() http.Handler {
 
 func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 	token := r.PathValue("token")
-	if token == "" {
-		http.Error(w, "missing token", http.StatusBadRequest)
+	legacy := legacyToken.MatchString(token)
+	if !legacy && !validToken.MatchString(token) {
+		http.Error(w, "invalid token", http.StatusBadRequest)
 		return
 	}
 	conn, err := s.upgrader.Upgrade(w, r, nil)
@@ -100,8 +108,9 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close()
+	conn.SetReadLimit(maxWSMessageBytes)
 
-	if legacyToken.MatchString(token) {
+	if legacy {
 		// Old clients only print errors read from an open socket, so close with
 		// the reason and wait for their close reply before dropping TCP.
 		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, legacyClientMsg))
@@ -143,9 +152,18 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
-	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes)
+	// Count the request against the store cap as it arrives, so parallel
+	// uploads can't overshoot it while they are still being received.
+	body := &quotaReader{ReadCloser: http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes), store: s.fileStore}
+	var kept int64
+	defer func() { s.fileStore.Release(body.n - kept) }()
+	r.Body = body
 
 	file, header, err := r.FormFile("file")
+	if body.full {
+		http.Error(w, "relay storage is full, try again in a few minutes", http.StatusInsufficientStorage)
+		return
+	}
 	if err != nil {
 		http.Error(w, "upload failed: "+err.Error(), http.StatusBadRequest)
 		return
@@ -174,6 +192,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if sf, ok := s.fileStore.Get(token); ok {
+		kept = sf.Size
 		s.uploadsTotal.Add(1)
 		s.uploadBytesTotal.Add(sf.Size)
 	}
@@ -261,6 +280,13 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
+	out := strings.Replace(string(content), "__RELAY_URL__", baseURL(r), 1)
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Write([]byte(out))
+}
+
+// baseURL is the address the client used to reach this relay.
+func baseURL(r *http.Request) string {
 	scheme := r.Header.Get("X-Forwarded-Proto")
 	if scheme == "" {
 		if r.TLS != nil {
@@ -269,9 +295,22 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 			scheme = "http"
 		}
 	}
-	out := strings.Replace(string(content), "__RELAY_URL__", scheme+"://"+r.Host, 1)
+	return scheme + "://" + r.Host
+}
+
+func (s *Server) handleRobots(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write([]byte(out))
+	w.Write([]byte("User-agent: *\nAllow: /\n\nSitemap: " + baseURL(r) + "/sitemap.xml\n"))
+}
+
+func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	base := html.EscapeString(baseURL(r))
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Write([]byte(`<?xml version="1.0" encoding="UTF-8"?>` + "\n" + `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">` + "\n"))
+	for _, p := range []string{"/", "/send", "/live", "/development"} {
+		w.Write([]byte("  <url><loc>" + base + p + "</loc></url>\n"))
+	}
+	w.Write([]byte("</urlset>\n"))
 }
 
 func (s *Server) handleRoomStatus(w http.ResponseWriter, r *http.Request) {

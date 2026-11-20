@@ -25,6 +25,7 @@ func testConfig() Config {
 		AllowAnyOrigin:  true,
 		RateLimitPerMin: 10000,
 		MaxUploadBytes:  500 << 20,
+		MaxStoreBytes:   2048 << 20,
 		FileExpiry:      10 * time.Minute,
 	}
 }
@@ -46,7 +47,7 @@ func newTestServerWithConfig(t *testing.T, cfg Config) *Server {
 
 func newTestFileStore(t *testing.T) *FileStore {
 	t.Helper()
-	fs, err := NewFileStore(context.Background(), newTestLogger(), 10*time.Minute)
+	fs, err := NewFileStore(context.Background(), newTestLogger(), 10*time.Minute, 2048<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +99,7 @@ func TestRoomAddClientLimit(t *testing.T) {
 	srv := httptest.NewServer(s.Routes())
 	defer srv.Close()
 
-	wsURL := "ws" + srv.URL[4:] + "/ws/limit-test"
+	wsURL := "ws" + srv.URL[4:] + "/ws/" + strings.Repeat("a", 32)
 
 	dialer := websocket.Dialer{}
 	conn1, _, err := dialer.Dial(wsURL, nil)
@@ -554,5 +555,95 @@ func TestLegacyClientsGetUpdateMessage(t *testing.T) {
 	defer conn.Close()
 	if _, _, err := conn.ReadMessage(); err == nil || !strings.Contains(err.Error(), "airpipe update") {
 		t.Fatalf("legacy ws: %v", err)
+	}
+}
+
+func uploadBlob(t *testing.T, url string, blob []byte) int {
+	t.Helper()
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	part, _ := mw.CreateFormFile("file", "encrypted.bin")
+	part.Write(blob)
+	mw.Close()
+	resp, err := http.Post(url+"/upload", mw.FormDataContentType(), body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestStoreCapRejectsUploadsWhenFull(t *testing.T) {
+	cfg := testConfig()
+	cfg.MaxStoreBytes = 3000
+	s := newTestServerWithConfig(t, cfg)
+	srv := httptest.NewServer(s.Routes())
+	defer srv.Close()
+
+	blob := make([]byte, 1000)
+	if code := uploadBlob(t, srv.URL, blob); code != http.StatusOK {
+		t.Fatalf("first upload: %d", code)
+	}
+	if code := uploadBlob(t, srv.URL, blob); code != http.StatusOK {
+		t.Fatalf("second upload: %d", code)
+	}
+	// 2000 stored; a third request (blob plus multipart framing) passes 3000.
+	if code := uploadBlob(t, srv.URL, blob); code != http.StatusInsufficientStorage {
+		t.Fatalf("upload past the cap: got %d, want 507", code)
+	}
+	if got := s.fileStore.used.Load(); got != 2000 {
+		t.Fatalf("reserved bytes after rejected upload: %d, want 2000", got)
+	}
+}
+
+func TestWebSocketRejectsBadTokenAndOversizedFrame(t *testing.T) {
+	s := newTestServer(t)
+	srv := httptest.NewServer(s.Routes())
+	defer srv.Close()
+	base := "ws" + srv.URL[4:] + "/ws/"
+
+	if _, resp, err := websocket.DefaultDialer.Dial(base+"not-a-token", nil); err == nil || resp == nil || resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("bad token should get 400 before upgrade: err=%v resp=%v", err, resp)
+	}
+
+	conn, _, err := websocket.DefaultDialer.Dial(base+strings.Repeat("b", 32), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	if err := conn.WriteMessage(websocket.BinaryMessage, make([]byte, maxWSMessageBytes+1)); err != nil {
+		t.Fatal(err)
+	}
+	conn.SetReadDeadline(time.Now().Add(5 * time.Second))
+	if _, _, err := conn.ReadMessage(); !websocket.IsCloseError(err, websocket.CloseMessageTooBig) {
+		t.Fatalf("oversized frame should close the socket with 1009, got %v", err)
+	}
+}
+
+func TestRobotsPointsAtSitemapAndPagesHaveShareImage(t *testing.T) {
+	s := newTestServer(t)
+	get := func(path string) string {
+		w := httptest.NewRecorder()
+		s.Routes().ServeHTTP(w, httptest.NewRequest("GET", "http://relay.example"+path, nil))
+		if w.Code != http.StatusOK {
+			t.Fatalf("GET %s: %d", path, w.Code)
+		}
+		return w.Body.String()
+	}
+	if body := get("/robots.txt"); !strings.Contains(body, "Sitemap: http://relay.example/sitemap.xml") {
+		t.Fatalf("robots.txt: %q", body)
+	}
+	sitemap := get("/sitemap.xml")
+	for _, page := range []string{"/", "/send", "/live", "/development"} {
+		if !strings.Contains(sitemap, "<loc>http://relay.example"+page+"</loc>") {
+			t.Errorf("sitemap is missing %s", page)
+		}
+		body := get(page)
+		if !strings.Contains(body, `property="og:image"`) || !strings.Contains(body, `name="twitter:card"`) {
+			t.Errorf("%s has no share image tags", page)
+		}
+	}
+	if !strings.HasPrefix(get("/site/og.png"), "\x89PNG") {
+		t.Fatal("/site/og.png is not a PNG")
 	}
 }

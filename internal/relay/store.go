@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-var errTokenExists = errors.New("token already exists")
+var (
+	errTokenExists = errors.New("token already exists")
+	errStoreFull   = errors.New("relay storage is full")
+)
 
 type StoredFile struct {
 	Path      string
@@ -28,28 +31,66 @@ type FileStore struct {
 	files        map[string]*StoredFile
 	dir          string
 	expiry       time.Duration
+	maxBytes     int64        // cap on stored blobs plus uploads in flight
+	used         atomic.Int64 // bytes reserved against maxBytes
 	log          *slog.Logger
 	ctx          context.Context
 	cancel       context.CancelFunc
 	expiredTotal atomic.Int64
 }
 
-func NewFileStore(parent context.Context, log *slog.Logger, expiry time.Duration) (*FileStore, error) {
+func NewFileStore(parent context.Context, log *slog.Logger, expiry time.Duration, maxBytes int64) (*FileStore, error) {
 	dir, err := os.MkdirTemp("", "airpipe-*")
 	if err != nil {
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(parent)
 	fs := &FileStore{
-		files:  make(map[string]*StoredFile),
-		dir:    dir,
-		expiry: expiry,
-		log:    log,
-		ctx:    ctx,
-		cancel: cancel,
+		files:    make(map[string]*StoredFile),
+		dir:      dir,
+		expiry:   expiry,
+		maxBytes: maxBytes,
+		log:      log,
+		ctx:      ctx,
+		cancel:   cancel,
 	}
 	go fs.cleanupLoop()
 	return fs, nil
+}
+
+// Reserve claims n bytes of the store's capacity, or reports that it is full.
+// The caller releases whatever it does not leave stored.
+func (fs *FileStore) Reserve(n int64) bool {
+	if fs.used.Add(n) > fs.maxBytes {
+		fs.used.Add(-n)
+		return false
+	}
+	return true
+}
+
+func (fs *FileStore) Release(n int64) {
+	fs.used.Add(-n)
+}
+
+// quotaReader reserves store capacity for each byte it reads and fails once
+// the store is full. n is what it holds reserved.
+type quotaReader struct {
+	io.ReadCloser
+	store *FileStore
+	n     int64
+	full  bool
+}
+
+func (q *quotaReader) Read(p []byte) (int, error) {
+	n, err := q.ReadCloser.Read(p)
+	if n > 0 {
+		if !q.store.Reserve(int64(n)) {
+			q.full = true
+			return 0, errStoreFull
+		}
+		q.n += int64(n)
+	}
+	return n, err
 }
 
 func (fs *FileStore) Store(filename string, r io.Reader, clientToken string) (string, error) {
@@ -129,6 +170,7 @@ func (fs *FileStore) cleanupLoop() {
 				if time.Since(f.CreatedAt) > fs.expiry {
 					os.Remove(f.Path)
 					delete(fs.files, token)
+					fs.Release(f.Size)
 					fs.expiredTotal.Add(1)
 					fs.log.Info("file expired", "token", shortToken(token))
 				}

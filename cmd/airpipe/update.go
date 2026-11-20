@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -8,6 +11,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"time"
 )
 
 func cmdUpdate() error {
@@ -19,22 +24,12 @@ func cmdUpdate() error {
 	if goos == "windows" {
 		ext = ".exe"
 	}
-	url := fmt.Sprintf("https://github.com/Sanyam-G/Airpipe/releases/latest/download/airpipe-%s-%s%s", goos, goarch, ext)
+	asset := fmt.Sprintf("airpipe-%s-%s%s", goos, goarch, ext)
 
 	fmt.Printf("  Current: %s%s%s\n", colorDim, buildVersion, colorReset)
 	fmt.Printf("  Downloading latest for %s/%s...\n", goos, goarch)
 
-	resp, err := http.Get(url)
-	if err != nil {
-		return fmt.Errorf("download failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("download failed: HTTP %d", resp.StatusCode)
-	}
-
-	binary, err := io.ReadAll(resp.Body)
+	binary, err := downloadRelease(latestReleaseAPI, asset)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
@@ -50,9 +45,22 @@ func cmdUpdate() error {
 		return fmt.Errorf("could not resolve path: %w", err)
 	}
 
-	// Write new binary to /tmp
-	tmpPath := filepath.Join(os.TempDir(), "airpipe-update"+ext)
-	if err := os.WriteFile(tmpPath, binary, 0755); err != nil {
+	// Unpredictable name, created exclusively: another local user can't
+	// pre-place a file or symlink at the path.
+	tmp, err := os.CreateTemp("", "airpipe-update-*"+ext)
+	if err != nil {
+		return fmt.Errorf("write to temp failed: %w", err)
+	}
+	tmpPath := tmp.Name()
+	_, err = tmp.Write(binary)
+	if err == nil {
+		err = tmp.Chmod(0755)
+	}
+	if cerr := tmp.Close(); err == nil {
+		err = cerr
+	}
+	if err != nil {
+		os.Remove(tmpPath)
 		return fmt.Errorf("write to temp failed: %w", err)
 	}
 
@@ -92,8 +100,7 @@ func cmdUpdate() error {
 	} else {
 		// Need sudo: remove old binary, move new one in
 		fmt.Printf("  Need sudo to update %s\n", execPath)
-		cmd := exec.Command("sudo", "sh", "-c",
-			fmt.Sprintf("rm -f %s && mv %s %s", execPath, tmpPath, execPath))
+		cmd := exec.Command("sudo", "sh", "-c", `rm -f "$1" && mv "$2" "$1"`, "sh", execPath, tmpPath)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
@@ -105,6 +112,58 @@ func cmdUpdate() error {
 
 	fmt.Printf("  %s✓ Updated %s%s (%s)\n\n", colorGreen, execPath, colorReset, fmtBytes(int64(len(binary))))
 	return nil
+}
+
+const latestReleaseAPI = "https://api.github.com/repos/Sanyam-G/Airpipe/releases/latest"
+
+// downloadRelease fetches the named asset of the release described at apiURL
+// and checks it against the SHA-256 digest GitHub records for the asset.
+func downloadRelease(apiURL, asset string) ([]byte, error) {
+	var release struct {
+		Assets []struct {
+			Name   string `json:"name"`
+			URL    string `json:"browser_download_url"`
+			Digest string `json:"digest"`
+		} `json:"assets"`
+	}
+	meta, err := httpGet(apiURL, 20*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(meta, &release); err != nil {
+		return nil, fmt.Errorf("release info: %w", err)
+	}
+	for _, a := range release.Assets {
+		if a.Name != asset {
+			continue
+		}
+		want, ok := strings.CutPrefix(a.Digest, "sha256:")
+		if !ok {
+			return nil, fmt.Errorf("release has no checksum for %s", asset)
+		}
+		binary, err := httpGet(a.URL, 5*time.Minute)
+		if err != nil {
+			return nil, err
+		}
+		sum := sha256.Sum256(binary)
+		if got := hex.EncodeToString(sum[:]); got != want {
+			return nil, fmt.Errorf("checksum mismatch for %s: got %s, want %s", asset, got, want)
+		}
+		return binary, nil
+	}
+	return nil, fmt.Errorf("latest release has no %s", asset)
+}
+
+func httpGet(url string, timeout time.Duration) ([]byte, error) {
+	resp, err := (&http.Client{Timeout: timeout}).Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP %d from %s", resp.StatusCode, url)
+	}
+	return io.ReadAll(resp.Body)
 }
 
 func copyFile(src, dst string) error {
