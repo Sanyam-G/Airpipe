@@ -32,6 +32,11 @@ const legacyClientMsg = "This relay runs AirPipe v5 and your client is older. Up
 // limit is not an AirPipe client.
 const maxWSMessageBytes = 1 << 20
 
+// Proxies such as Cloudflare drop a websocket after ~100 s without traffic,
+// which cut off senders still waiting for their receiver. Clients answer
+// pings on their own, so a ping now and then keeps the socket open.
+var wsPingInterval = 30 * time.Second
+
 type Server struct {
 	cfg         Config
 	log         *slog.Logger
@@ -134,6 +139,23 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 		room.mu.Unlock()
 		if isEmpty {
 			s.roomManager.DeleteRoom(token)
+		}
+	}()
+
+	stopPing := make(chan struct{})
+	defer close(stopPing)
+	go func() {
+		t := time.NewTicker(wsPingInterval)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				if conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(10*time.Second)) != nil {
+					return
+				}
+			case <-stopPing:
+				return
+			}
 		}
 	}()
 

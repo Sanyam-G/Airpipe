@@ -647,3 +647,31 @@ func TestRobotsPointsAtSitemapAndPagesHaveShareImage(t *testing.T) {
 		t.Fatal("/site/og.png is not a PNG")
 	}
 }
+
+func TestWebSocketKeepalivePings(t *testing.T) {
+	old := wsPingInterval
+	wsPingInterval = 20 * time.Millisecond
+	defer func() { wsPingInterval = old }()
+	srv := httptest.NewServer(newTestServer(t).Routes())
+	defer srv.Close()
+
+	conn, _, err := websocket.DefaultDialer.Dial("ws"+strings.TrimPrefix(srv.URL, "http")+"/ws/"+strings.Repeat("c", 32), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	pinged := make(chan struct{}, 1)
+	conn.SetPingHandler(func(string) error {
+		select {
+		case pinged <- struct{}{}:
+		default:
+		}
+		return nil
+	})
+	go conn.ReadMessage()
+	select {
+	case <-pinged:
+	case <-time.After(5 * time.Second):
+		t.Fatal("relay sent no keepalive ping to an idle socket")
+	}
+}
