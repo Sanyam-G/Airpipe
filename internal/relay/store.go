@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -23,6 +24,7 @@ type StoredFile struct {
 	Filename  string
 	Size      int64
 	CreatedAt time.Time
+	Owner     string // client IP charged for it against the per-client cap
 }
 
 // FileStore holds encrypted mailbox blobs on disk until they expire.
@@ -33,13 +35,16 @@ type FileStore struct {
 	expiry       time.Duration
 	maxBytes     int64        // cap on stored blobs plus uploads in flight
 	used         atomic.Int64 // bytes reserved against maxBytes
+	perOwner     int64        // cap on what one client can hold reserved
+	ownerMu      sync.Mutex
+	owners       map[string]int64
 	log          *slog.Logger
 	ctx          context.Context
 	cancel       context.CancelFunc
 	expiredTotal atomic.Int64
 }
 
-func NewFileStore(parent context.Context, log *slog.Logger, expiry time.Duration, maxBytes int64) (*FileStore, error) {
+func NewFileStore(parent context.Context, log *slog.Logger, expiry time.Duration, maxBytes, perOwner int64) (*FileStore, error) {
 	dir, err := os.MkdirTemp("", "airpipe-*")
 	if err != nil {
 		return nil, err
@@ -50,6 +55,8 @@ func NewFileStore(parent context.Context, log *slog.Logger, expiry time.Duration
 		dir:      dir,
 		expiry:   expiry,
 		maxBytes: maxBytes,
+		perOwner: perOwner,
+		owners:   make(map[string]int64),
 		log:      log,
 		ctx:      ctx,
 		cancel:   cancel,
@@ -58,33 +65,49 @@ func NewFileStore(parent context.Context, log *slog.Logger, expiry time.Duration
 	return fs, nil
 }
 
-// Reserve claims n bytes of the store's capacity, or reports that it is full.
-// The caller releases whatever it does not leave stored.
-func (fs *FileStore) Reserve(n int64) bool {
-	if fs.used.Add(n) > fs.maxBytes {
-		fs.used.Add(-n)
+// Reserve claims n bytes of the store's capacity for owner, or reports that
+// the store or owner's share of it is full. The caller releases whatever it
+// does not leave stored.
+func (fs *FileStore) Reserve(owner string, n int64) bool {
+	fs.ownerMu.Lock()
+	defer fs.ownerMu.Unlock()
+	if fs.owners[owner]+n > fs.perOwner || fs.used.Load()+n > fs.maxBytes {
 		return false
 	}
+	fs.owners[owner] += n
+	fs.used.Add(n)
 	return true
 }
 
-func (fs *FileStore) Release(n int64) {
+func (fs *FileStore) Release(owner string, n int64) {
+	fs.ownerMu.Lock()
+	defer fs.ownerMu.Unlock()
+	if fs.owners[owner] -= n; fs.owners[owner] <= 0 {
+		delete(fs.owners, owner)
+	}
 	fs.used.Add(-n)
 }
+
+// uploadIdleTimeout drops an upload whose client stops sending, so a stalled
+// body can't hold its reservation open.
+const uploadIdleTimeout = time.Minute
 
 // quotaReader reserves store capacity for each byte it reads and fails once
 // the store is full. n is what it holds reserved.
 type quotaReader struct {
 	io.ReadCloser
 	store *FileStore
+	owner string
+	rc    *http.ResponseController
 	n     int64
 	full  bool
 }
 
 func (q *quotaReader) Read(p []byte) (int, error) {
+	q.rc.SetReadDeadline(time.Now().Add(uploadIdleTimeout))
 	n, err := q.ReadCloser.Read(p)
 	if n > 0 {
-		if !q.store.Reserve(int64(n)) {
+		if !q.store.Reserve(q.owner, int64(n)) {
 			q.full = true
 			return 0, errStoreFull
 		}
@@ -93,7 +116,7 @@ func (q *quotaReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func (fs *FileStore) Store(filename string, r io.Reader, clientToken string) (string, error) {
+func (fs *FileStore) Store(filename string, r io.Reader, clientToken, owner string) (string, error) {
 	token := clientToken
 	if token == "" {
 		token = genToken()
@@ -131,6 +154,7 @@ func (fs *FileStore) Store(filename string, r io.Reader, clientToken string) (st
 		Filename:  filename,
 		Size:      size,
 		CreatedAt: time.Now(),
+		Owner:     owner,
 	}
 	fs.mu.Unlock()
 
@@ -170,7 +194,7 @@ func (fs *FileStore) cleanupLoop() {
 				if time.Since(f.CreatedAt) > fs.expiry {
 					os.Remove(f.Path)
 					delete(fs.files, token)
-					fs.Release(f.Size)
+					fs.Release(f.Owner, f.Size)
 					fs.expiredTotal.Add(1)
 					fs.log.Info("file expired", "token", shortToken(token))
 				}

@@ -56,7 +56,7 @@ type Server struct {
 }
 
 func New(parent context.Context, cfg Config, log *slog.Logger, version string) (*Server, error) {
-	store, err := NewFileStore(parent, log, cfg.FileExpiry, cfg.MaxStoreBytes)
+	store, err := NewFileStore(parent, log, cfg.FileExpiry, cfg.MaxStoreBytes, max(cfg.MaxUploadBytes, cfg.MaxStoreBytes/4))
 	if err != nil {
 		return nil, err
 	}
@@ -176,9 +176,17 @@ func (s *Server) handleWebSocket(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 	// Count the request against the store cap as it arrives, so parallel
 	// uploads can't overshoot it while they are still being received.
-	body := &quotaReader{ReadCloser: http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes), store: s.fileStore}
+	// Each client can hold at most a quarter of it (or one upload), so one
+	// can't fill it for everyone else.
+	owner := s.clientIP(r)
+	body := &quotaReader{
+		ReadCloser: http.MaxBytesReader(w, r.Body, s.cfg.MaxUploadBytes),
+		store:      s.fileStore,
+		owner:      owner,
+		rc:         http.NewResponseController(w),
+	}
 	var kept int64
-	defer func() { s.fileStore.Release(body.n - kept) }()
+	defer func() { s.fileStore.Release(owner, body.n-kept) }()
 	r.Body = body
 
 	file, header, err := r.FormFile("file")
@@ -202,7 +210,7 @@ func (s *Server) handleUploadFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := s.fileStore.Store(header.Filename, file, clientToken)
+	token, err := s.fileStore.Store(header.Filename, file, clientToken, owner)
 	if err != nil {
 		if errors.Is(err, errTokenExists) {
 			http.Error(w, "token conflict", http.StatusConflict)

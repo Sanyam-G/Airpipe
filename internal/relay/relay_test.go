@@ -47,7 +47,7 @@ func newTestServerWithConfig(t *testing.T, cfg Config) *Server {
 
 func newTestFileStore(t *testing.T) *FileStore {
 	t.Helper()
-	fs, err := NewFileStore(context.Background(), newTestLogger(), 10*time.Minute, 2048<<20)
+	fs, err := NewFileStore(context.Background(), newTestLogger(), 10*time.Minute, 2048<<20, 2048<<20)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,7 +274,7 @@ func TestFileStoreRoundtrip(t *testing.T) {
 	fs := newTestFileStore(t)
 	content := []byte("hello airpipe")
 
-	token, err := fs.Store("test.txt", bytes.NewReader(content), "")
+	token, err := fs.Store("test.txt", bytes.NewReader(content), "", "")
 	if err != nil {
 		t.Fatalf("Store failed: %v", err)
 	}
@@ -559,13 +559,22 @@ func TestLegacyClientsGetUpdateMessage(t *testing.T) {
 }
 
 func uploadBlob(t *testing.T, url string, blob []byte) int {
+	return uploadBlobFrom(t, url, blob, "")
+}
+
+func uploadBlobFrom(t *testing.T, url string, blob []byte, ip string) int {
 	t.Helper()
 	body := &bytes.Buffer{}
 	mw := multipart.NewWriter(body)
 	part, _ := mw.CreateFormFile("file", "encrypted.bin")
 	part.Write(blob)
 	mw.Close()
-	resp, err := http.Post(url+"/upload", mw.FormDataContentType(), body)
+	req, _ := http.NewRequest("POST", url+"/upload", body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	if ip != "" {
+		req.Header.Set("Cf-Connecting-Ip", ip)
+	}
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -593,6 +602,30 @@ func TestStoreCapRejectsUploadsWhenFull(t *testing.T) {
 	}
 	if got := s.fileStore.used.Load(); got != 2000 {
 		t.Fatalf("reserved bytes after rejected upload: %d, want 2000", got)
+	}
+}
+
+func TestStoreCapLimitsEachClientToAShare(t *testing.T) {
+	cfg := testConfig()
+	cfg.TrustProxyHeaders = true
+	cfg.MaxUploadBytes = 1500
+	cfg.MaxStoreBytes = 8000 // a client's share is 2000
+	s := newTestServerWithConfig(t, cfg)
+	srv := httptest.NewServer(s.Routes())
+	defer srv.Close()
+
+	blob := make([]byte, 1000)
+	if code := uploadBlobFrom(t, srv.URL, blob, "198.51.100.1"); code != http.StatusOK {
+		t.Fatalf("first upload: %d", code)
+	}
+	if code := uploadBlobFrom(t, srv.URL, blob, "198.51.100.1"); code != http.StatusInsufficientStorage {
+		t.Fatalf("same client past its share: got %d, want 507", code)
+	}
+	if code := uploadBlobFrom(t, srv.URL, blob, "198.51.100.2"); code != http.StatusOK {
+		t.Fatalf("another client: %d", code)
+	}
+	if got := s.fileStore.used.Load(); got != 2000 {
+		t.Fatalf("reserved bytes: %d, want 2000", got)
 	}
 }
 
