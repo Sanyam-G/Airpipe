@@ -46,7 +46,7 @@ func cmdDownload(relay string, args []string) error {
 	fmt.Print("  Looking up...")
 
 	httpRelay := toHTTP(relay)
-	resp, err := http.Head(httpRelay + "/raw/" + derivedToken)
+	resp, err := quickHTTP.Head(httpRelay + "/raw/" + derivedToken)
 	if err != nil {
 		return fmt.Errorf("relay unreachable: %w", err)
 	}

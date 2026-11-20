@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Sanyam-G/Airpipe/v5/internal/transfer"
 )
@@ -15,7 +16,7 @@ import (
 // checkRelay stops early when the relay speaks another protocol version.
 // Mismatched versions derive different rooms, so the transfer would otherwise just wait.
 func checkRelay(relay string) error {
-	resp, err := http.Get(toHTTP(relay) + "/health")
+	resp, err := quickHTTP.Get(toHTTP(relay) + "/health")
 	if err != nil {
 		return fmt.Errorf("relay unreachable: %w", err)
 	}
@@ -35,6 +36,10 @@ func checkRelay(relay string) error {
 	}
 	return nil
 }
+
+// quickHTTP is for small relay requests, so a relay that accepts the
+// connection but never answers can't hang the CLI.
+var quickHTTP = &http.Client{Timeout: 20 * time.Second}
 
 func uploadEncrypted(baseURL string, ciphertext []byte, clientToken string) (string, error) {
 	pr, pw := io.Pipe()
